@@ -1,0 +1,61 @@
+/*
+ * CASHBOX REPORT DEBUGGING GUIDE
+ * ==============================
+ * 
+ * المشكلة: التقرير الشهري يعرض قيم صفرية رغم وجود بيانات
+ * 
+ * خطوات التشخيص:
+ * ===============
+ * 
+ * 1. تحقق من البيانات في PostgreSQL:
+ *    SELECT * FROM cashtransactions WHERE month = 2 AND year = 2026 AND isdeleted = false;
+ *    
+ * 2. تحقق من قيم الـ enum:
+ *    Income = 1, Expense = 2 (في C#)
+ *    transactiontype = 1 (إيراد), transactiontype = 2 (مصروف) في DB
+ *    
+ * 3. تحقق من الـ Logging في Output Window:
+ *    - عدد المعاملات المحملة
+ *    - قيم الإيرادات والمصروفات
+ *    - تفاصيل كل معاملة
+ *    
+ * الحل المطبق:
+ * =============
+ * 
+ * تم إضافة logging statements في:
+ * 1. CashBoxService.cs -> GetMonthlyReportAsync()
+ * 2. CashBoxReportForm.cs -> UpdateSummaryCards()
+ * 
+ * عند تشغيل البرنامج، افتح Output Window وشاهد:
+ * - عدد المعاملات المحملة
+ * - قيم الإيرادات والمصروفات المحسوبة
+ * - إذا كانت القيم صحيحة في Service لكن خطأ في Form، فالمشكلة في UI
+ * - إذا كانت القيم خطأ في Service، فالمشكلة في Query
+ * 
+ * البيانات الحالية في DB:
+ * ========================
+ * 
+ * cashtransactions (2 rows):
+ * - ID 4: transactiontype=1 (Income), amount=1500, category=سياحة داخلية, month=2, year=2026
+ * - ID 5: transactiontype=2 (Expense), amount=940, category=رحلة داخلية, month=2, year=2026
+ * 
+ * النتائج المتوقعة:
+ * ================
+ * - إجمالي الإيرادات: 1500 جنيه
+ * - إجمالي المصروفات: 940 جنيه  
+ * - صافي الربح: 560 جنيه
+ * 
+ * إذا ظهرت القيم صحيحة في Output لكن البطاقات لا تزال صفرية:
+ * =======================================================
+ * المشكلة في UpdateSummaryCards() - تحقق من:
+ * 1. هل cardsLayout != null
+ * 2. هل incomeCard, expenseCard, profitCard != null
+ * 3. هل valueLabel في كل بطاقة != null
+ */
+
+// لتشغيل الـ debugging:
+// 1. اعمل Build للمشروع
+// 2. افتح Output Window (View -> Output)
+// 3. اختر "Debug" من القائمة المنسدلة
+// 4. شغل البرنامج وافتح التقرير الشهري
+// 5. شاهد الـ messages

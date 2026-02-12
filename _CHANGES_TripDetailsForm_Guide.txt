@@ -1,0 +1,24 @@
+    private void BuildGuideTab()
+    {
+        var tab = _tabControl.TabPages[5];
+        tab.BackColor = Color.White;
+        tab.AutoScroll = true;
+        tab.Padding = new Padding(30);
+        
+        if (!_trip.Guides.Any())
+        {
+            AddEmptyMessage(tab, "👤 لا توجد بيانات مرشد مسجلة");
+            return;
+        }
+        
+        int y = 30;
+        foreach (var guide in _trip.Guides)
+        {
+            AddInfoItem(tab, "اسم المرشد:", guide.GuideName, ref y, bold: true);
+            AddInfoItem(tab, "الهاتف:", guide.Phone ?? "غير محدد", ref y);
+            AddInfoItem(tab, "البريد:", guide.Email ?? "غير محدد", ref y);
+            AddInfoItem(tab, "اللغات:", guide.Languages ?? "غير محدد", ref y);
+            // تم إزالة: المبلغ الأساسي، العمولة، الإجمالي
+            y += 20;
+        }
+    }

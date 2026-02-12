@@ -1,0 +1,37 @@
+        private void BtnAdd_Click(object? sender, EventArgs e)
+        {
+            var addForm = new AddEditBankAccountForm(_context, _currentUserId);
+            addForm.FormClosed += (s, args) => LoadBankAccounts();
+            addForm.Show();
+        }
+
+        private void BtnEdit_Click(object? sender, EventArgs e)
+        {
+            if (dgvBanks.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("يرجى اختيار حساب بنكي للتعديل", "تنبيه",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                return;
+            }
+
+            int bankId = Convert.ToInt32(dgvBanks.SelectedRows[0].Cells["Id"].Value);
+            var editForm = new AddEditBankAccountForm(_context, _currentUserId, bankId);
+            editForm.FormClosed += (s, args) => LoadBankAccounts();
+            editForm.Show();
+        }
+
+        private void BtnTransfer_Click(object? sender, EventArgs e)
+        {
+            var transferForm = new BankTransferForm(_context, _currentUserId);
+            transferForm.FormClosed += (s, args) => LoadBankAccounts();
+            transferForm.Show();
+        }
+
+        private void BtnFawateerk_Click(object? sender, EventArgs e)
+        {
+            var fawateerkForm = new FawateerkPaymentForm(_context, _currentUserId);
+            fawateerkForm.FormClosed += (s, args) => LoadBankAccounts();
+            fawateerkForm.Show();
+        }

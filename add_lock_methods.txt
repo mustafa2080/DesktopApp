@@ -1,0 +1,20 @@
+
+    // ══════════════════════════════════════
+    // Lock/Unlock for Trips Department
+    // ══════════════════════════════════════
+    
+    public async Task<bool> LockTripForTripsAsync(int tripId)
+    {
+        await _context.Database.ExecuteSqlRawAsync(
+            "UPDATE trips SET islockedfortrips = true WHERE tripid = {0}",
+            tripId);
+        return true;
+    }
+    
+    public async Task<bool> UnlockTripForTripsAsync(int tripId)
+    {
+        await _context.Database.ExecuteSqlRawAsync(
+            "UPDATE trips SET islockedfortrips = false WHERE tripid = {0}",
+            tripId);
+        return true;
+    }

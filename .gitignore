@@ -1,0 +1,50 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.log
+
+# Visual Studio
+.vs/
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+
+# NuGet
+*.nupkg
+**/packages/*
+!**/packages/build/
+
+# Database
+*.bak
+*.db
+*.sqlite
+*.sqlite3
+
+# Local settings
+appsettings.local.json
+appsettings.json
+appsettings.*.json
+connectionstrings.local.json
+*.env
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Rider
+.idea/
+
+# User-specific files
+*.rsuser
+*.userosscache
+*.sln.docstates

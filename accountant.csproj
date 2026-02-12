@@ -1,0 +1,115 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows7.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>GraceWay.AccountingSystem</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <NoWarn>$(NoWarn);CA1416;NU1608;NU1701</NoWarn>
+    <ApplicationIcon>Resources\Icons\ico.ico</ApplicationIcon>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="Resources\Icons\ico.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="InsertUmrahData\**" />
+    <Compile Remove="SeedSuppliers\**" />
+    <Compile Remove="SetupAdmin\**" />
+    <Compile Remove="DatabaseFix\**" />
+    <Compile Remove="CheckDB\**" />
+    <Compile Remove="FixTripPrograms\**" />
+    <Compile Remove="UpdateTripPrograms\**" />
+    <Compile Remove="CheckTripProgramsColumns\**" />
+    <Compile Remove="FixAdultChildColumns\**" />
+    <Compile Remove="FixGuideCostDirect\**" />
+    <Compile Remove="FixDriverTip\**" />
+    <Compile Remove="FixAllDriverTip\**" />
+    <Compile Remove="FixTransportColumns\**" />
+    <Compile Remove="FixTripProgramsGuideCost\**" />
+    <Compile Remove="FixDatabaseConstraint\**" />
+    <Compile Remove="FixCurrencyForeignKey\**" />
+    <Compile Remove="QuickDbTest.cs" />
+    <Compile Remove="TestCustomerAddition.cs" />
+    <Compile Remove="TestSuppliersQuery.cs" />
+    <Compile Remove="TestConnection.cs" />
+    <Compile Remove="GenerateAdminHash.cs" />
+    <Compile Remove="FixColumnNames.cs" />
+    <Compile Remove="CheckInvoices.cs" />
+    <Compile Remove="FixDriverTipColumn.cs" />
+    <Compile Remove="FixTripTransportations.cs" />
+    <Compile Remove="TestConfig.cs" />
+    <EmbeddedResource Remove="InsertUmrahData\**" />
+    <EmbeddedResource Remove="SeedSuppliers\**" />
+    <EmbeddedResource Remove="SetupAdmin\**" />
+    <EmbeddedResource Remove="DatabaseFix\**" />
+    <EmbeddedResource Remove="CheckDB\**" />
+    <EmbeddedResource Remove="FixTripPrograms\**" />
+    <EmbeddedResource Remove="UpdateTripPrograms\**" />
+    <EmbeddedResource Remove="CheckTripProgramsColumns\**" />
+    <EmbeddedResource Remove="FixAdultChildColumns\**" />
+    <EmbeddedResource Remove="FixGuideCostDirect\**" />
+    <EmbeddedResource Remove="FixDriverTip\**" />
+    <EmbeddedResource Remove="FixAllDriverTip\**" />
+    <EmbeddedResource Remove="FixTransportColumns\**" />
+    <EmbeddedResource Remove="FixTripProgramsGuideCost\**" />
+    <EmbeddedResource Remove="FixDatabaseConstraint\**" />
+    <EmbeddedResource Remove="FixCurrencyForeignKey\**" />
+    <None Remove="InsertUmrahData\**" />
+    <None Remove="SeedSuppliers\**" />
+    <None Remove="SetupAdmin\**" />
+    <None Remove="DatabaseFix\**" />
+    <None Remove="CheckDB\**" />
+    <None Remove="FixTripPrograms\**" />
+    <None Remove="UpdateTripPrograms\**" />
+    <None Remove="CheckTripProgramsColumns\**" />
+    <None Remove="FixAdultChildColumns\**" />
+    <None Remove="FixGuideCostDirect\**" />
+    <None Remove="FixDriverTip\**" />
+    <None Remove="FixAllDriverTip\**" />
+    <None Remove="FixTransportColumns\**" />
+    <None Remove="FixTripProgramsGuideCost\**" />
+    <None Remove="FixDatabaseConstraint\**" />
+    <None Remove="FixCurrencyForeignKey\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Database -->
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Dapper" Version="2.1.35" />
+    <PackageReference Include="Npgsql" Version="9.0.0" />
+    
+    <!-- Dependency Injection & Configuration -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="9.0.0" />
+    
+    <!-- Password Hashing -->
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    
+    <!-- Charts and UI -->
+    <PackageReference Include="LiveChartsCore.SkiaSharpView.WinForms" Version="2.0.0-rc4.5" />
+    
+    <!-- Reports -->
+    <PackageReference Include="FastReport.OpenSource" Version="2025.1.0" />
+    <PackageReference Include="FastReport.OpenSource.Export.PdfSimple" Version="2025.1.0" />
+    <PackageReference Include="ClosedXML" Version="0.104.2" />
+  </ItemGroup>
+
+</Project>
