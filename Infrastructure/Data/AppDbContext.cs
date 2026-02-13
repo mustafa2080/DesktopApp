@@ -21,15 +21,30 @@ public class AppDbContext : DbContext
         
         if (optionsBuilder.IsConfigured)
         {
-            // إضافة command timeout ل 30 ثانية
+            // Use NoTracking by default for better concurrency
+            // Individual queries can override with AsTracking() if needed
             optionsBuilder.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
         }
     }
 
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        await LogChangesAsync();
-        return await base.SaveChangesAsync(cancellationToken);
+        // Use retry logic for concurrency conflicts
+        return await ConcurrencyExceptionHandler.ExecuteWithRetryAsync(async () =>
+        {
+            await LogChangesAsync();
+            return await base.SaveChangesAsync(cancellationToken);
+        });
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        return base.DisposeAsync();
     }
 
     private async Task LogChangesAsync()
@@ -1755,6 +1770,8 @@ public class AppDbContext : DbContext
             entity.Property(e => e.PhoneNumber).HasColumnName("phonenumber").HasMaxLength(20);
             entity.Property(e => e.IdentityNumber).HasColumnName("identitynumber").HasMaxLength(50);
             entity.Property(e => e.Age).HasColumnName("age");
+            entity.Property(e => e.RoomType).HasColumnName("roomtype").HasConversion<int?>();
+            entity.Property(e => e.SharedRoomNumber).HasColumnName("sharedroomnumber").HasMaxLength(20);
             entity.Property(e => e.TotalAmount).HasColumnName("totalamount");
             entity.Property(e => e.PaidAmount).HasColumnName("paidamount");
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>();
@@ -1925,5 +1942,93 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.EntityType);
             entity.HasIndex(e => e.Timestamp);
         });
+
+        // ════════════════════════════════════════════════════════════════
+        // CONCURRENCY CONTROL - PostgreSQL xmin system column
+        // ════════════════════════════════════════════════════════════════
+        // Configure xmin as concurrency token for all critical tables
+        ConfigureConcurrencyTokens(modelBuilder);
+    }
+
+    private void ConfigureConcurrencyTokens(ModelBuilder modelBuilder)
+    {
+        // Tables that need concurrency control
+        modelBuilder.Entity<CashBox>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<CashTransaction>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<SalesInvoice>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<PurchaseInvoice>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<Trip>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<TripBooking>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<UmrahPackage>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<UmrahTrip>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<FlightBooking>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<Customer>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<Supplier>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<Account>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<JournalEntry>()
+            .Property<uint>("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsConcurrencyToken();
     }
 }

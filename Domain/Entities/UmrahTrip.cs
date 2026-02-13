@@ -47,6 +47,7 @@ public class UmrahTrip
     /// نوع الغرفة
     /// </summary>
     [Required]
+    [Column("roomtype")]
     public RoomType RoomType { get; set; }
     
     // ══════════════════════════════════════

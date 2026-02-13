@@ -12,16 +12,18 @@ public partial class MainForm : Form
     private readonly string _currentUserName;
     private readonly int _currentUserId;
     private readonly IServiceProvider _serviceProvider;
+    private readonly string _sessionId; // ✅ Store session ID
     private SidebarControl? _sidebar;
     private HeaderControl? _header;
     private Panel? _contentPanel;
     private DashboardControl? _dashboard;
 
-    public MainForm(string userName, int userId, IServiceProvider serviceProvider)
+    public MainForm(string userName, int userId, IServiceProvider serviceProvider, string sessionId)
     {
         _currentUserName = userName;
         _currentUserId = userId;
         _serviceProvider = serviceProvider;
+        _sessionId = sessionId; // ✅ Store session ID
         InitializeComponent();
         InitializeCustomComponents();
         SetupMainLayout();
@@ -556,6 +558,10 @@ public partial class MainForm : Form
                     ShowAuditLogs();
                     break;
 
+                case "sessions":
+                    ShowActiveSessions();
+                    break;
+
                 case "accounts":
                     ShowChartOfAccounts();
                     break;
@@ -705,6 +711,19 @@ public partial class MainForm : Form
         auditForm.Show();
     }
 
+    private void ShowActiveSessions()
+    {
+        _contentPanel?.Controls.Clear();
+        var sessionsForm = new ActiveSessionsForm
+        {
+            TopLevel = false,
+            FormBorderStyle = FormBorderStyle.None,
+            Dock = DockStyle.Fill
+        };
+        _contentPanel?.Controls.Add(sessionsForm);
+        sessionsForm.Show();
+    }
+
     private void ShowJournalEntries()
     {
         _contentPanel?.Controls.Clear();
@@ -750,7 +769,8 @@ public partial class MainForm : Form
         
         // Tab 1: Trial Balance
         var trialBalanceTab = new TabPage("⚖️ ميزان المراجعة");
-        var trialBalanceForm = new TrialBalanceReportForm(dbContextFactory)
+        var exportService1 = _serviceProvider.GetRequiredService<IExportService>();
+        var trialBalanceForm = new TrialBalanceReportForm(dbContextFactory, exportService1)
         {
             TopLevel = false,
             FormBorderStyle = FormBorderStyle.None,
@@ -880,6 +900,10 @@ public partial class MainForm : Form
         {
             Console.WriteLine("🚪 User logging out - clearing current user session");
             
+            // ✅ End the session
+            SessionManager.Instance.EndSession(_sessionId);
+            System.Diagnostics.Debug.WriteLine($"✅ Session ended: {_sessionId}");
+            
             // ✅ CRITICAL: Clear current user from AuthService (Singleton)
             var authService = _serviceProvider.GetRequiredService<IAuthService>();
             authService.Logout();
@@ -896,5 +920,21 @@ public partial class MainForm : Form
             };
             loginForm.Show();
         }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        // ✅ End session when form closes
+        try
+        {
+            SessionManager.Instance.EndSession(_sessionId);
+            System.Diagnostics.Debug.WriteLine($"✅ Session ended on form close: {_sessionId}");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"❌ Error ending session: {ex.Message}");
+        }
+        
+        base.OnFormClosing(e);
     }
 }

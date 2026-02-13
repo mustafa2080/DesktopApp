@@ -261,13 +261,16 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
             card.Paint += PaintCard;
             card.Paint += (s, e) =>
             {
-                // شريط علوي بلون مميز
-                using var brush = new LinearGradientBrush(
-                    new Rectangle(0, 0, card.Width, 6),
-                    ColorScheme.Primary,
-                    ColorScheme.PrimaryDark,
-                    LinearGradientMode.Horizontal);
-                e.Graphics.FillRectangle(brush, 0, 0, card.Width, 6);
+                // شريط علوي بلون مميز - فحص الأبعاد أولاً
+                if (card.Width > 0 && card.Height > 0)
+                {
+                    using var brush = new LinearGradientBrush(
+                        new Rectangle(0, 0, card.Width, 6),
+                        ColorScheme.Primary,
+                        ColorScheme.PrimaryDark,
+                        LinearGradientMode.Horizontal);
+                    e.Graphics.FillRectangle(brush, 0, 0, card.Width, 6);
+                }
             };
 
             // العنوان مع أيقونة

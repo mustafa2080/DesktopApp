@@ -22,6 +22,7 @@ public partial class UmrahPackagesListForm : Form
     private Button _deleteButton = null!;
     private Button _detailsButton = null!;
     private Button _refreshButton = null!;
+    private Button _exportPilgrimsButton = null!;
     private ComboBox _statusFilterCombo = null!;
     private CheckBox _activeOnlyCheck = null!;
     private DataGridView _packagesGrid = null!;
@@ -158,6 +159,15 @@ public partial class UmrahPackagesListForm : Form
             BorderStyle = BorderStyle.None,
             PlaceholderText = "ابحث باسم الرحلة أو رقم الحزمة..."
         };
+        
+        // Auto-select all text when clicking on search box
+        _searchBox.Enter += (s, e) => _searchBox.SelectAll();
+        _searchBox.MouseClick += (s, e) => 
+        {
+            if (!_searchBox.Focused)
+                _searchBox.SelectAll();
+        };
+        
         _searchBox.KeyPress += (s, e) => { if (e.KeyChar == (char)13) SearchPackages(); };
         searchContainer.Controls.Add(_searchBox);
         
@@ -243,6 +253,10 @@ public partial class UmrahPackagesListForm : Form
         _detailsButton.Enabled = false;
         actionsPanel.Controls.Add(_detailsButton);
         
+        _exportPilgrimsButton = CreateModernButton("📥 تصدير المعتمرين", Color.FromArgb(52, 152, 219), new Point(455, 0), 155, ExportPilgrims_Click);
+        _exportPilgrimsButton.Enabled = false;
+        actionsPanel.Controls.Add(_exportPilgrimsButton);
+        
         _headerPanel.Controls.Add(actionsPanel);
         
         // ══════════════════════════════════════
@@ -258,6 +272,7 @@ public partial class UmrahPackagesListForm : Form
             ReadOnly = true,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             MultiSelect = false,
+            AutoGenerateColumns = false, // ✅ منع توليد أعمدة إنجليزية تلقائياً
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
             RowHeadersVisible = false,
             Font = new Font("Cairo", 9.5F),
@@ -492,6 +507,7 @@ public partial class UmrahPackagesListForm : Form
         {
             Name = "Status",
             HeaderText = "الحالة",
+            DataPropertyName = "Status", // ✅ إضافة ربط البيانات
             Width = 95,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
             DefaultCellStyle = new DataGridViewCellStyle
@@ -507,6 +523,7 @@ public partial class UmrahPackagesListForm : Form
         {
             Name = "CreatedByUserName",
             HeaderText = "المستخدم",
+            DataPropertyName = "CreatedByUserName", // ✅ إضافة ربط البيانات
             Width = 140,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
             DefaultCellStyle = new DataGridViewCellStyle
@@ -758,6 +775,7 @@ public partial class UmrahPackagesListForm : Form
         _editButton.Enabled = hasSelection;
         _deleteButton.Enabled = hasSelection;
         _detailsButton.Enabled = hasSelection;
+        _exportPilgrimsButton.Enabled = hasSelection;
     }
     
     private Button CreateModernButton(string text, Color backColor, Point location, int width, EventHandler clickHandler)
@@ -793,5 +811,176 @@ public partial class UmrahPackagesListForm : Form
         };
         
         return button;
+    }
+    
+    private async void ExportPilgrims_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (_packagesGrid.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("الرجاء اختيار حزمة أولاً!", "تنبيه",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            
+            int packageId = Convert.ToInt32(_packagesGrid.SelectedRows[0].Cells["UmrahPackageId"].Value!);
+            var package = await _umrahService.GetPackageByIdAsync(packageId);
+            
+            if (package == null)
+            {
+                MessageBox.Show("لم يتم العثور على الحزمة!", "خطأ",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+            
+            if (package.Pilgrims == null || !package.Pilgrims.Any())
+            {
+                MessageBox.Show("لا يوجد معتمرين في هذه الحزمة!", "تنبيه",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            
+            using var saveDialog = new SaveFileDialog
+            {
+                Filter = "Excel Files|*.xlsx",
+                Title = "حفظ قائمة المعتمرين",
+                FileName = $"معتمرين_{package.PackageNumber}_{DateTime.Now:yyyy-MM-dd_HHmm}.xlsx"
+            };
+            
+            if (saveDialog.ShowDialog() != DialogResult.OK)
+                return;
+            
+            using var workbook = new ClosedXML.Excel.XLWorkbook();
+            var worksheet = workbook.Worksheets.Add("المعتمرين");
+            
+            // Title
+            worksheet.Cell(1, 1).Value = "قائمة المعتمرين";
+            worksheet.Cell(1, 1).Style.Font.Bold = true;
+            worksheet.Cell(1, 1).Style.Font.FontSize = 18;
+            worksheet.Cell(1, 1).Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(41, 128, 185);
+            worksheet.Cell(1, 1).Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+            worksheet.Range(1, 1, 1, 10).Merge();
+            worksheet.Range(1, 1, 1, 10).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            
+            // Package Info
+            worksheet.Cell(2, 1).Value = $"رقم الحزمة: {package.PackageNumber}";
+            worksheet.Range(2, 1, 2, 3).Merge();
+            worksheet.Cell(2, 4).Value = $"اسم الرحلة: {package.TripName}";
+            worksheet.Range(2, 4, 2, 7).Merge();
+            worksheet.Cell(2, 8).Value = $"عدد المعتمرين: {package.Pilgrims.Count}";
+            worksheet.Range(2, 8, 2, 10).Merge();
+            
+            worksheet.Cell(3, 1).Value = $"التاريخ: {package.Date:yyyy-MM-dd}";
+            worksheet.Range(3, 1, 3, 3).Merge();
+            worksheet.Cell(3, 4).Value = $"الحالة: {GetStatusArabic(package.Status)}";
+            worksheet.Range(3, 4, 3, 10).Merge();
+            
+            // Headers
+            int headerRow = 5;
+            string[] headers = { "#", "الاسم", "رقم الجواز", "تاريخ الميلاد", "الجنسية", 
+                               "رقم الهاتف", "نوع الغرفة", "رقم الغرفة", "ملاحظات", "السعر" };
+            
+            for (int i = 0; i < headers.Length; i++)
+            {
+                worksheet.Cell(headerRow, i + 1).Value = headers[i];
+            }
+            
+            var headerRange = worksheet.Range(headerRow, 1, headerRow, 10);
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(52, 73, 94);
+            headerRange.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+            headerRange.Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            
+            // Data
+            int currentRow = headerRow + 1;
+            int counter = 1;
+            
+            foreach (var pilgrim in package.Pilgrims.OrderBy(p => p.FullName))
+            {
+                worksheet.Cell(currentRow, 1).Value = counter++;
+                worksheet.Cell(currentRow, 2).Value = pilgrim.FullName ?? "";
+                worksheet.Cell(currentRow, 3).Value = pilgrim.IdentityNumber ?? "";
+                worksheet.Cell(currentRow, 4).Value = pilgrim.Age?.ToString() ?? "";
+                worksheet.Cell(currentRow, 5).Value = "";
+                worksheet.Cell(currentRow, 6).Value = pilgrim.PhoneNumber ?? "";
+                worksheet.Cell(currentRow, 7).Value = pilgrim.RoomType?.ToString() ?? "";
+                worksheet.Cell(currentRow, 8).Value = pilgrim.SharedRoomNumber ?? "";
+                worksheet.Cell(currentRow, 9).Value = pilgrim.Notes ?? "";
+                worksheet.Cell(currentRow, 10).Value = package.SellingPrice;
+                
+                // Alternating row colors
+                if (currentRow % 2 == 0)
+                {
+                    var rowRange = worksheet.Range(currentRow, 1, currentRow, 10);
+                    rowRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(245, 248, 250);
+                }
+                
+                currentRow++;
+            }
+            
+            // Summary
+            int summaryRow = currentRow + 1;
+            worksheet.Cell(summaryRow, 1).Value = "الإجمالي";
+            worksheet.Cell(summaryRow, 1).Style.Font.Bold = true;
+            worksheet.Range(summaryRow, 1, summaryRow, 9).Merge();
+            worksheet.Cell(summaryRow, 10).Value = package.Pilgrims.Count * package.SellingPrice;
+            worksheet.Cell(summaryRow, 10).Style.Font.Bold = true;
+            
+            var summaryRange = worksheet.Range(summaryRow, 1, summaryRow, 10);
+            summaryRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.LightGray;
+            summaryRange.Style.Font.Bold = true;
+            
+            // Formatting
+            worksheet.Column(1).Width = 8;   // #
+            worksheet.Column(2).Width = 30;  // الاسم
+            worksheet.Column(3).Width = 18;  // رقم الجواز
+            worksheet.Column(4).Width = 15;  // تاريخ الميلاد
+            worksheet.Column(5).Width = 15;  // الجنسية
+            worksheet.Column(6).Width = 18;  // رقم الهاتف
+            worksheet.Column(7).Width = 15;  // نوع الغرفة
+            worksheet.Column(8).Width = 12;  // رقم الغرفة
+            worksheet.Column(9).Width = 25;  // ملاحظات
+            worksheet.Column(10).Width = 15; // السعر
+            
+            worksheet.Column(10).Style.NumberFormat.Format = "#,##0.00";
+            
+            // Alignment
+            worksheet.Column(1).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            worksheet.Column(3).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            worksheet.Column(4).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            worksheet.Column(7).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            worksheet.Column(8).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            worksheet.Column(10).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            
+            workbook.SaveAs(saveDialog.FileName);
+            
+            MessageBox.Show($"✅ تم تصدير قائمة المعتمرين بنجاح!\n\nعدد المعتمرين: {package.Pilgrims.Count}\nالملف: {saveDialog.FileName}", 
+                "نجح", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = saveDialog.FileName,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"خطأ في تصدير المعتمرين: {ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+    
+    private string GetStatusArabic(PackageStatus status)
+    {
+        return status switch
+        {
+            PackageStatus.Draft => "مسودة",
+            PackageStatus.Confirmed => "مؤكد",
+            PackageStatus.InProgress => "قيد التنفيذ",
+            PackageStatus.Completed => "مكتمل",
+            PackageStatus.Cancelled => "ملغي",
+            _ => status.ToString()
+        };
     }
 }

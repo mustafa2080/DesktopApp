@@ -1,16 +1,35 @@
-import psycopg2
+import sqlite3
 
-conn = psycopg2.connect('host=localhost dbname=graceway_accounting user=postgres password=123456')
-cur = conn.cursor()
+conn = sqlite3.connect('accountant.db')
+cursor = conn.cursor()
 
-# Get all tables
+# Get all table names
+cursor.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+tables = cursor.fetchall()
+
 print("=" * 60)
-print("Tables in database")
+print("All Tables in Database:")
 print("=" * 60)
-cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name")
-tables = cur.fetchall()
 for table in tables:
     print(f"  - {table[0]}")
 
-cur.close()
+print("\n" + "=" * 60)
+print("Searching for RoomType-related tables:")
+print("=" * 60)
+
+# Search for tables containing "room" or "umrah"
+for table in tables:
+    table_name = table[0]
+    if 'room' in table_name.lower() or 'umrah' in table_name.lower():
+        print(f"\n📋 Table: {table_name}")
+        
+        # Get columns
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        columns = cursor.fetchall()
+        
+        print("   Columns:")
+        for col in columns:
+            col_id, name, col_type, not_null, default, pk = col
+            print(f"     - {name} ({col_type})")
+
 conn.close()

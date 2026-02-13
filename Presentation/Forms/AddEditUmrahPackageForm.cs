@@ -52,6 +52,7 @@ public partial class AddEditUmrahPackageForm : Form
     private Label _lblTotalRevenue = null!;
     private Label _lblNetProfit = null!;
     private Label _lblProfitMargin = null!;
+    private Label _lblNetProfitPerPerson = null!;
     
     // Status & Notes
     private ComboBox _cmbStatus = null!;
@@ -85,12 +86,12 @@ public partial class AddEditUmrahPackageForm : Form
     private void SetupForm()
     {
         this.Text = _packageId.HasValue ? "تعديل حزمة العمرة" : "إضافة حزمة عمرة جديدة";
-        this.Size = new Size(1100, 800);
+        this.Size = new Size(1150, 850);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.RightToLeft = RightToLeft.Yes;
         this.RightToLeftLayout = true;
         this.BackColor = ColorScheme.Background;
-        this.Font = new Font("Cairo", 10F);
+        this.Font = new Font("Cairo", 11F);
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
         this.MinimizeBox = false;
@@ -116,33 +117,33 @@ public partial class AddEditUmrahPackageForm : Form
         
         // Row 1: Package Number + Date
         AddLabel(mainPanel, "رقم الحزمة:", 30, yPosition);
-        _txtPackageNumber = AddTextBox(mainPanel, 200, yPosition, 250);
+        _txtPackageNumber = AddTextBox(mainPanel, 200, yPosition, 280);
         _txtPackageNumber.ReadOnly = true;
-        _txtPackageNumber.BackColor = Color.WhiteSmoke;
+        _txtPackageNumber.BackColor = Color.FromArgb(245, 245, 245);
         
-        AddLabel(mainPanel, "التاريخ:", 530, yPosition);
+        AddLabel(mainPanel, "التاريخ:", 540, yPosition);
         _dtpDate = AddDatePicker(mainPanel, 650, yPosition);
-        yPosition += 50;
+        yPosition += 60;
         
         // Row 2: Trip Name
         AddLabel(mainPanel, "اسم الرحلة:", 30, yPosition);
         _txtPilgrimName = AddTextBox(mainPanel, 200, yPosition, 820);
-        yPosition += 50;
+        yPosition += 60;
         
         // Row 3: Number of Persons + Room Type
         AddLabel(mainPanel, "عدد الأفراد:", 30, yPosition);
         _numPersons = AddNumericUpDown(mainPanel, 200, yPosition, 1, 50);
         _numPersons.ValueChanged += NumPersons_ValueChanged;
         
-        AddLabel(mainPanel, "نوع الغرفة:", 530, yPosition);
-        _cmbRoomType = AddComboBox(mainPanel, 650, yPosition, 370);
+        AddLabel(mainPanel, "نوع الغرفة:", 460, yPosition);
+        _cmbRoomType = AddComboBox(mainPanel, 590, yPosition, 430);
         _cmbRoomType.Items.AddRange(new object[] { "مفردة", "ثنائي", "ثلاثي", "رباعي", "خماسي" });
-        _cmbRoomType.SelectedIndex = 1;
-        yPosition += 50;
+        _cmbRoomType.SelectedIndex = 1; // Default to "ثنائي"
+        yPosition += 60;
         
         // Row 4: Pilgrims List
         AddLabel(mainPanel, "أسماء المعتمرين:", 30, yPosition);
-        yPosition += 30;
+        yPosition += 35;
         
         _dgvPilgrims = new DataGridView
         {
@@ -158,35 +159,137 @@ public partial class AddEditUmrahPackageForm : Form
             {
                 BackColor = ColorScheme.Primary,
                 ForeColor = Color.White,
-                Font = new Font("Cairo", 10F, FontStyle.Bold),
-                Alignment = DataGridViewContentAlignment.MiddleCenter
+                Font = new Font("Cairo", 11F, FontStyle.Bold),
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Padding = new Padding(8),
+                WrapMode = DataGridViewTriState.False
             },
             DefaultCellStyle = new DataGridViewCellStyle
             {
-                Font = new Font("Cairo", 9.5F),
+                Font = new Font("Cairo", 10F),
                 BackColor = Color.White,
                 SelectionBackColor = ColorScheme.Accent,
-                SelectionForeColor = Color.White
+                SelectionForeColor = Color.White,
+                Padding = new Padding(5),
+                Alignment = DataGridViewContentAlignment.MiddleCenter
             },
             RowHeadersVisible = false,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+            ColumnHeadersHeight = 45,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
+            RowTemplate = new DataGridViewRow { Height = 42 },
+            EnableHeadersVisualStyles = false
         };
         
-        // Add columns
+        // Add columns with explicit widths
         _dgvPilgrims.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Number",
-            HeaderText = "رقم",
-            Width = 60,
-            ReadOnly = true
+            HeaderText = "م",
+            Width = 50,
+            ReadOnly = true,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Font = new Font("Cairo", 10F, FontStyle.Bold)
+            }
         });
         
         _dgvPilgrims.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Name",
             HeaderText = "اسم المعتمر",
-            AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+            Width = 470,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Alignment = DataGridViewContentAlignment.MiddleRight,
+                Padding = new Padding(10, 5, 10, 5)
+            }
         });
+        
+        // إضافة عمود نوع الغرفة
+        var roomTypeColumn = new DataGridViewComboBoxColumn
+        {
+            Name = "RoomType",
+            HeaderText = "نوع الغرفة",
+            Width = 150,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Alignment = DataGridViewContentAlignment.MiddleCenter
+            },
+            ValueType = typeof(string),
+            DisplayStyle = DataGridViewComboBoxDisplayStyle.Nothing,
+            DataPropertyName = "" // منع الربط التلقائي
+        };
+        // استخدام نفس القيم العربية الموجودة في ComboBox الرئيسي
+        roomTypeColumn.Items.Add("مفردة");
+        roomTypeColumn.Items.Add("ثنائي");
+        roomTypeColumn.Items.Add("ثلاثي");
+        roomTypeColumn.Items.Add("رباعي");
+        roomTypeColumn.Items.Add("خماسي");
+        
+        // ✅ منع عرض القيم الإنجليزية
+        roomTypeColumn.DisplayStyleForCurrentCellOnly = false;
+        
+        _dgvPilgrims.Columns.Add(roomTypeColumn);
+        
+        // ✅ معالج لتحويل أي قيمة إنجليزية إلى عربية تلقائياً
+        _dgvPilgrims.CellValueChanged += (s, e) =>
+        {
+            if (e.RowIndex >= 0 && e.ColumnIndex == _dgvPilgrims.Columns["RoomType"].Index)
+            {
+                var cell = _dgvPilgrims.Rows[e.RowIndex].Cells["RoomType"];
+                if (cell.Value != null)
+                {
+                    string currentValue = cell.Value.ToString() ?? "";
+                    string normalizedValue = NormalizeRoomType(currentValue);
+                    
+                    if (currentValue != normalizedValue)
+                    {
+                        Console.WriteLine($"⚠️ Converting room type from '{currentValue}' to '{normalizedValue}'");
+                        cell.Value = normalizedValue;
+                    }
+                }
+            }
+        };
+        
+        // إضافة عمود رقم الغرفة المشتركة
+        _dgvPilgrims.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "SharedRoomNumber",
+            HeaderText = "رقم الغرفة المشتركة",
+            Width = 180,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Alignment = DataGridViewContentAlignment.MiddleCenter
+            }
+        });
+        
+        // تعطيل الترتيب في جميع الأعمدة
+        foreach (DataGridViewColumn column in _dgvPilgrims.Columns)
+        {
+            column.SortMode = DataGridViewColumnSortMode.NotSortable;
+        }
+        
+        // ✅ معالج لضمان عرض القيم العربية فقط
+        _dgvPilgrims.CellFormatting += (s, e) =>
+        {
+            if (e.ColumnIndex == _dgvPilgrims.Columns["RoomType"].Index && e.RowIndex >= 0)
+            {
+                if (e.Value != null)
+                {
+                    string value = e.Value.ToString() ?? "";
+                    // إذا كانت القيمة إنجليزية، حولها فوراً
+                    if (value == "Single" || value == "Double" || value == "Triple" || 
+                        value == "Quad" || value == "Quint" || value == "Suite")
+                    {
+                        string arabicValue = NormalizeRoomType(value);
+                        e.Value = arabicValue;
+                        Console.WriteLine($"🔄 Auto-converted '{value}' to '{arabicValue}' during display");
+                    }
+                }
+            }
+        };
         
         mainPanel.Controls.Add(_dgvPilgrims);
         yPosition += 220;
@@ -198,19 +301,19 @@ public partial class AddEditUmrahPackageForm : Form
         
         // Row 1: Makkah Hotel + Nights
         AddLabel(mainPanel, "فندق مكة:", 30, yPosition);
-        _txtMakkahHotel = AddTextBox(mainPanel, 200, yPosition, 370);
+        _txtMakkahHotel = AddTextBox(mainPanel, 200, yPosition, 430);
         
-        AddLabel(mainPanel, "عدد الليالي:", 600, yPosition);
-        _numMakkahNights = AddNumericUpDown(mainPanel, 720, yPosition, 0, 30);
-        yPosition += 50;
+        AddLabel(mainPanel, "عدد الليالي:", 680, yPosition);
+        _numMakkahNights = AddNumericUpDown(mainPanel, 820, yPosition, 0, 30);
+        yPosition += 60;
         
         // Row 2: Madinah Hotel + Nights
         AddLabel(mainPanel, "فندق المدينة:", 30, yPosition);
-        _txtMadinahHotel = AddTextBox(mainPanel, 200, yPosition, 370);
+        _txtMadinahHotel = AddTextBox(mainPanel, 200, yPosition, 430);
         
-        AddLabel(mainPanel, "عدد الليالي:", 600, yPosition);
-        _numMadinahNights = AddNumericUpDown(mainPanel, 720, yPosition, 0, 30);
-        yPosition += 70;
+        AddLabel(mainPanel, "عدد الليالي:", 680, yPosition);
+        _numMadinahNights = AddNumericUpDown(mainPanel, 820, yPosition, 0, 30);
+        yPosition += 80;
         
         // ══════════════════════════════════════════════════════════════
         // SECTION 3: وسيلة السفر
@@ -220,7 +323,7 @@ public partial class AddEditUmrahPackageForm : Form
         AddLabel(mainPanel, "وسيلة السفر:", 30, yPosition);
         _txtTransportMethod = AddTextBox(mainPanel, 200, yPosition, 820);
         _txtTransportMethod.PlaceholderText = "مثال: طيران مباشر، طيران مع ترانزيت، باص...";
-        yPosition += 70;
+        yPosition += 80;
         
         // ══════════════════════════════════════════════════════════════
         // SECTION 4: الأسعار والتكاليف
@@ -231,47 +334,47 @@ public partial class AddEditUmrahPackageForm : Form
         AddLabel(mainPanel, "سعر البيع (للفرد):", 30, yPosition);
         _numSellingPrice = AddNumericUpDown(mainPanel, 200, yPosition, 0, 1000000, 2);
         _numSellingPrice.ValueChanged += (s, e) => CalculateTotals();
-        AddCurrencyLabel(mainPanel, "ج.م", 480, yPosition);
-        yPosition += 50;
+        AddCurrencyLabel(mainPanel, "ج.م", 420, yPosition);
+        yPosition += 60;
         
         // Row 2: Visa Price SAR + Exchange Rate
         AddLabel(mainPanel, "سعر التأشيرة:", 30, yPosition);
         _numVisaPriceSAR = AddNumericUpDown(mainPanel, 200, yPosition, 0, 100000, 2);
         _numVisaPriceSAR.ValueChanged += (s, e) => CalculateTotals();
-        AddCurrencyLabel(mainPanel, "ر.س", 480, yPosition);
+        AddCurrencyLabel(mainPanel, "ر.س", 420, yPosition);
         
-        AddLabel(mainPanel, "سعر الصرف:", 530, yPosition);
-        _numExchangeRate = AddNumericUpDown(mainPanel, 650, yPosition, 0, 100, 4);
+        AddLabel(mainPanel, "سعر الصرف:", 490, yPosition);
+        _numExchangeRate = AddNumericUpDown(mainPanel, 620, yPosition, 0, 100, 4);
         _numExchangeRate.Value = 13.5m;
         _numExchangeRate.ValueChanged += (s, e) => CalculateTotals();
         
-        _lblVisaEGP = AddCalculatedLabel(mainPanel, "= 0 ج.م", 930, yPosition);
-        yPosition += 50;
+        _lblVisaEGP = AddCalculatedLabel(mainPanel, "= 0 ج.م", 840, yPosition);
+        yPosition += 60;
         
         // Row 3: Accommodation + Barcode
         AddLabel(mainPanel, "إجمالي الإقامة:", 30, yPosition);
         _numAccommodationTotal = AddNumericUpDown(mainPanel, 200, yPosition, 0, 1000000, 2);
         _numAccommodationTotal.ValueChanged += (s, e) => CalculateTotals();
-        AddCurrencyLabel(mainPanel, "ج.م", 480, yPosition);
+        AddCurrencyLabel(mainPanel, "ج.م", 420, yPosition);
         
-        AddLabel(mainPanel, "سعر الباركود:", 530, yPosition);
-        _numBarcodePrice = AddNumericUpDown(mainPanel, 650, yPosition, 0, 100000, 2);
+        AddLabel(mainPanel, "سعر الباركود:", 490, yPosition);
+        _numBarcodePrice = AddNumericUpDown(mainPanel, 620, yPosition, 0, 100000, 2);
         _numBarcodePrice.ValueChanged += (s, e) => CalculateTotals();
-        AddCurrencyLabel(mainPanel, "ج.م", 930, yPosition);
-        yPosition += 50;
+        AddCurrencyLabel(mainPanel, "ج.م", 840, yPosition);
+        yPosition += 60;
         
         // Row 4: Flight + Fast Train SAR
         AddLabel(mainPanel, "سعر الطيران:", 30, yPosition);
         _numFlightPrice = AddNumericUpDown(mainPanel, 200, yPosition, 0, 1000000, 2);
         _numFlightPrice.ValueChanged += (s, e) => CalculateTotals();
-        AddCurrencyLabel(mainPanel, "ج.م", 480, yPosition);
+        AddCurrencyLabel(mainPanel, "ج.م", 420, yPosition);
         
-        AddLabel(mainPanel, "القطار السريع:", 530, yPosition);
-        _numFastTrainSAR = AddNumericUpDown(mainPanel, 650, yPosition, 0, 100000, 2);
+        AddLabel(mainPanel, "القطار السريع:", 490, yPosition);
+        _numFastTrainSAR = AddNumericUpDown(mainPanel, 620, yPosition, 0, 100000, 2);
         _numFastTrainSAR.ValueChanged += (s, e) => CalculateTotals();
-        AddCurrencyLabel(mainPanel, "ر.س", 930, yPosition);
-        _lblFastTrainEGP = AddCalculatedLabel(mainPanel, "= 0 ج.م", 1000, yPosition);
-        yPosition += 70;
+        AddCurrencyLabel(mainPanel, "ر.س", 840, yPosition);
+        _lblFastTrainEGP = AddCalculatedLabel(mainPanel, "= 0 ج.م", 950, yPosition);
+        yPosition += 80;
         
         // ══════════════════════════════════════════════════════════════
         // SECTION 5: الوسيط والمشرف
@@ -280,23 +383,23 @@ public partial class AddEditUmrahPackageForm : Form
         
         // Row 1: Broker Name + Commission
         AddLabel(mainPanel, "اسم الوسيط:", 30, yPosition);
-        _txtBrokerName = AddTextBox(mainPanel, 200, yPosition, 280);
+        _txtBrokerName = AddTextBox(mainPanel, 200, yPosition, 330);
         
-        AddLabel(mainPanel, "العمولة:", 510, yPosition);
-        _numCommission = AddNumericUpDown(mainPanel, 600, yPosition, 0, 100000, 2);
+        AddLabel(mainPanel, "العمولة:", 580, yPosition);
+        _numCommission = AddNumericUpDown(mainPanel, 680, yPosition, 0, 100000, 2);
         _numCommission.ValueChanged += (s, e) => CalculateTotals();
-        AddCurrencyLabel(mainPanel, "ج.م", 880, yPosition);
-        yPosition += 50;
+        AddCurrencyLabel(mainPanel, "ج.م", 900, yPosition);
+        yPosition += 60;
         
         // Row 2: Supervisor Name + Expenses
         AddLabel(mainPanel, "اسم المشرف:", 30, yPosition);
-        _txtSupervisorName = AddTextBox(mainPanel, 200, yPosition, 280);
+        _txtSupervisorName = AddTextBox(mainPanel, 200, yPosition, 330);
         
-        AddLabel(mainPanel, "مصاريف المشرف:", 510, yPosition);
-        _numSupervisorExpenses = AddNumericUpDown(mainPanel, 650, yPosition, 0, 100000, 2);
+        AddLabel(mainPanel, "مصاريف المشرف:", 580, yPosition);
+        _numSupervisorExpenses = AddNumericUpDown(mainPanel, 750, yPosition, 0, 100000, 2);
         _numSupervisorExpenses.ValueChanged += (s, e) => CalculateTotals();
-        AddCurrencyLabel(mainPanel, "ج.م", 930, yPosition);
-        yPosition += 70;
+        AddCurrencyLabel(mainPanel, "ج.م", 970, yPosition);
+        yPosition += 80;
         
         // ══════════════════════════════════════════════════════════════
         // SECTION 6: الحسابات المالية (Read-Only)
@@ -306,30 +409,57 @@ public partial class AddEditUmrahPackageForm : Form
         Panel calculationsPanel = new Panel
         {
             Location = new Point(30, yPosition),
-            Size = new Size(1020, 140),
-            BackColor = Color.FromArgb(245, 248, 250),
-            BorderStyle = BorderStyle.FixedSingle
+            Size = new Size(990, 200),
+            BackColor = Color.FromArgb(245, 250, 255),
+            BorderStyle = BorderStyle.FixedSingle,
+            Padding = new Padding(20)
         };
         
         int calcY = 15;
         
         // Row 1: Total Costs + Total Revenue
         AddCalculationLabel(calculationsPanel, "إجمالي التكاليف (للفرد):", 20, calcY);
-        _lblTotalCosts = AddBigCalculatedValue(calculationsPanel, "0.00 ج.م", 400, calcY);
+        _lblTotalCosts = AddBigCalculatedValue(calculationsPanel, "0.00 ج.م", 300, calcY, ColorScheme.Primary);
         
         AddCalculationLabel(calculationsPanel, "إجمالي الإيرادات:", 520, calcY);
-        _lblTotalRevenue = AddBigCalculatedValue(calculationsPanel, "0.00 ج.م", 850, calcY);
-        calcY += 45;
+        _lblTotalRevenue = AddBigCalculatedValue(calculationsPanel, "0.00 ج.م", 750, calcY, ColorScheme.Primary);
+        calcY += 50;
+        
+        // Separator Line
+        Panel separatorLine1 = new Panel
+        {
+            Location = new Point(20, calcY),
+            Size = new Size(930, 1),
+            BackColor = Color.FromArgb(200, 200, 200)
+        };
+        calculationsPanel.Controls.Add(separatorLine1);
+        calcY += 15;
         
         // Row 2: Net Profit + Profit Margin
-        AddCalculationLabel(calculationsPanel, "صافي الربح:", 20, calcY);
-        _lblNetProfit = AddBigCalculatedValue(calculationsPanel, "0.00 ج.م", 400, calcY, ColorScheme.Success);
+        AddCalculationLabel(calculationsPanel, "صافي الربح الإجمالي:", 20, calcY);
+        _lblNetProfit = AddBigCalculatedValue(calculationsPanel, "0.00 ج.م", 300, calcY, ColorScheme.Success);
         
         AddCalculationLabel(calculationsPanel, "هامش الربح:", 520, calcY);
-        _lblProfitMargin = AddBigCalculatedValue(calculationsPanel, "0.00 %", 850, calcY, ColorScheme.Info);
+        _lblProfitMargin = AddBigCalculatedValue(calculationsPanel, "0.00 %", 750, calcY, ColorScheme.Info);
+        calcY += 50;
+        
+        // Separator Line
+        Panel separatorLine2 = new Panel
+        {
+            Location = new Point(20, calcY),
+            Size = new Size(930, 1),
+            BackColor = Color.FromArgb(200, 200, 200)
+        };
+        calculationsPanel.Controls.Add(separatorLine2);
+        calcY += 15;
+        
+        // Row 3: Net Profit Per Person (Centered)
+        AddCalculationLabel(calculationsPanel, "صافي الربح للفرد:", 340, calcY);
+        _lblNetProfitPerPerson = AddBigCalculatedValue(calculationsPanel, "0.00 ج.م", 550, calcY, Color.FromArgb(76, 175, 80));
+        _lblNetProfitPerPerson.Font = new Font("Cairo", 16F, FontStyle.Bold);
         
         mainPanel.Controls.Add(calculationsPanel);
-        yPosition += 160;
+        yPosition += 220;
         
         // ══════════════════════════════════════════════════════════════
         // SECTION 7: الحالة والملاحظات
@@ -338,33 +468,65 @@ public partial class AddEditUmrahPackageForm : Form
         
         // Row 1: Status + Is Active
         AddLabel(mainPanel, "الحالة:", 30, yPosition);
-        _cmbStatus = AddComboBox(mainPanel, 200, yPosition, 370);
+        _cmbStatus = AddComboBox(mainPanel, 200, yPosition, 430);
         _cmbStatus.Items.AddRange(new object[] { "مسودة", "مؤكد", "قيد التنفيذ", "مكتمل", "ملغي" });
         _cmbStatus.SelectedIndex = 0;
         
         _chkIsActive = new CheckBox
         {
             Text = "حزمة نشطة",
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
-            Location = new Point(650, yPosition),
+            Font = new Font("Cairo", 11F, FontStyle.Bold),
+            Location = new Point(680, yPosition + 5),
             AutoSize = true,
-            Checked = true
+            Checked = true,
+            ForeColor = ColorScheme.Success
         };
         mainPanel.Controls.Add(_chkIsActive);
-        yPosition += 50;
+        yPosition += 60;
         
         // Row 2: Notes
         AddLabel(mainPanel, "ملاحظات:", 30, yPosition);
         _txtNotes = new TextBox
         {
             Location = new Point(200, yPosition),
-            Size = new Size(820, 80),
-            Font = new Font("Cairo", 10F),
+            Size = new Size(820, 100),
+            Font = new Font("Cairo", 11F),
             Multiline = true,
-            ScrollBars = ScrollBars.Vertical
+            ScrollBars = ScrollBars.Vertical,
+            BorderStyle = BorderStyle.FixedSingle
         };
+        
+        bool isFirstKeyPressNotes = false;
+        
+        // Auto-select all text when clicking on notes field
+        _txtNotes.Enter += (s, e) => 
+        {
+            _txtNotes.SelectAll();
+            isFirstKeyPressNotes = true;
+        };
+        
+        _txtNotes.MouseClick += (s, e) => 
+        {
+            if (!_txtNotes.Focused)
+            {
+                _txtNotes.SelectAll();
+                isFirstKeyPressNotes = true;
+            }
+        };
+        
+        _txtNotes.KeyPress += (s, e) =>
+        {
+            if (isFirstKeyPressNotes && !char.IsControl(e.KeyChar))
+            {
+                _txtNotes.Clear();
+                isFirstKeyPressNotes = false;
+            }
+        };
+        
+        _txtNotes.Leave += (s, e) => isFirstKeyPressNotes = false;
+        
         mainPanel.Controls.Add(_txtNotes);
-        yPosition += 100;
+        yPosition += 120;
         
         // ══════════════════════════════════════════════════════════════
         // ACTION BUTTONS
@@ -372,16 +534,16 @@ public partial class AddEditUmrahPackageForm : Form
         Panel buttonsPanel = new Panel
         {
             Location = new Point(30, yPosition),
-            Size = new Size(1020, 50),
+            Size = new Size(1020, 60),
             BackColor = Color.Transparent
         };
         
         _btnSave = new Button
         {
-            Text = "💾 حفظ",
-            Font = new Font("Cairo", 11F, FontStyle.Bold),
-            Size = new Size(150, 45),
-            Location = new Point(870, 0),
+            Text = "💾 حفظ الحزمة",
+            Font = new Font("Cairo", 12F, FontStyle.Bold),
+            Size = new Size(180, 50),
+            Location = new Point(840, 5),
             BackColor = ColorScheme.Success,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -394,9 +556,9 @@ public partial class AddEditUmrahPackageForm : Form
         _btnCancel = new Button
         {
             Text = "✖ إلغاء",
-            Font = new Font("Cairo", 11F, FontStyle.Bold),
-            Size = new Size(150, 45),
-            Location = new Point(700, 0),
+            Font = new Font("Cairo", 12F, FontStyle.Bold),
+            Size = new Size(150, 50),
+            Location = new Point(670, 5),
             BackColor = ColorScheme.Secondary,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -423,16 +585,16 @@ public partial class AddEditUmrahPackageForm : Form
         Label header = new Label
         {
             Text = text,
-            Font = new Font("Cairo", 12F, FontStyle.Bold),
+            Font = new Font("Cairo", 13F, FontStyle.Bold),
             ForeColor = ColorScheme.Primary,
             Location = new Point(30, yPosition),
-            Size = new Size(1020, 30),
-            BackColor = Color.FromArgb(240, 245, 250),
+            Size = new Size(1020, 40),
+            BackColor = Color.FromArgb(235, 245, 255),
             TextAlign = ContentAlignment.MiddleRight,
-            Padding = new Padding(0, 0, 10, 0)
+            Padding = new Padding(0, 0, 15, 0)
         };
         parent.Controls.Add(header);
-        yPosition += 45;
+        yPosition += 55;
     }
     
     private void AddLabel(Panel parent, string text, int x, int y)
@@ -440,8 +602,9 @@ public partial class AddEditUmrahPackageForm : Form
         Label label = new Label
         {
             Text = text,
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
-            Location = new Point(x, y + 5),
+            Font = new Font("Cairo", 11F, FontStyle.Bold),
+            ForeColor = ColorScheme.TextPrimary,
+            Location = new Point(x, y + 8),
             AutoSize = true
         };
         parent.Controls.Add(label);
@@ -452,9 +615,41 @@ public partial class AddEditUmrahPackageForm : Form
         TextBox textBox = new TextBox
         {
             Location = new Point(x, y),
-            Size = new Size(width, 30),
-            Font = new Font("Cairo", 10F)
+            Size = new Size(width, 35),
+            Font = new Font("Cairo", 11F),
+            BorderStyle = BorderStyle.FixedSingle
         };
+        
+        bool isFirstKeyPress = false;
+        
+        // Auto-select all text when entering the textbox
+        textBox.Enter += (s, e) => 
+        {
+            textBox.SelectAll();
+            isFirstKeyPress = true;
+        };
+        
+        textBox.MouseClick += (s, e) => 
+        {
+            if (!textBox.Focused)
+            {
+                textBox.SelectAll();
+                isFirstKeyPress = true;
+            }
+        };
+        
+        // عند الكتابة، إذا كانت أول ضغطة، نمسح المحتوى
+        textBox.KeyPress += (s, e) =>
+        {
+            if (isFirstKeyPress && !char.IsControl(e.KeyChar))
+            {
+                textBox.Clear();
+                isFirstKeyPress = false;
+            }
+        };
+        
+        textBox.Leave += (s, e) => isFirstKeyPress = false;
+        
         parent.Controls.Add(textBox);
         return textBox;
     }
@@ -464,13 +659,54 @@ public partial class AddEditUmrahPackageForm : Form
         NumericUpDown numericUpDown = new NumericUpDown
         {
             Location = new Point(x, y),
-            Size = new Size(250, 30),
-            Font = new Font("Cairo", 10F),
+            Size = new Size(200, 35),
+            Font = new Font("Cairo", 11F),
             Minimum = min,
             Maximum = max,
             DecimalPlaces = decimalPlaces,
-            ThousandsSeparator = true
+            ThousandsSeparator = true,
+            TextAlign = HorizontalAlignment.Center
         };
+        
+        bool isFirstKeyPress = false;
+        
+        // عند الدخول للحقل، نحدد كل النص ونعلم أن الضغطة القادمة هي الأولى
+        numericUpDown.Enter += (s, e) => 
+        {
+            numericUpDown.Select(0, numericUpDown.Text.Length);
+            isFirstKeyPress = true;
+        };
+        
+        // عند الضغط بالماوس
+        numericUpDown.MouseClick += (s, e) => 
+        {
+            if (!numericUpDown.Focused)
+            {
+                numericUpDown.Select(0, numericUpDown.Text.Length);
+                isFirstKeyPress = true;
+            }
+        };
+        
+        // عند الضغط على أي مفتاح رقم، نمسح القيمة القديمة أولاً
+        numericUpDown.KeyPress += (s, e) => 
+        {
+            if (isFirstKeyPress && char.IsDigit(e.KeyChar))
+            {
+                numericUpDown.Value = 0;
+                isFirstKeyPress = false;
+            }
+            else if (!char.IsDigit(e.KeyChar) && e.KeyChar != (char)8 && e.KeyChar != '.' && e.KeyChar != ',')
+            {
+                isFirstKeyPress = false;
+            }
+        };
+        
+        // إذا ترك المستخدم الحقل، نعيد تعيين العلامة
+        numericUpDown.Leave += (s, e) => 
+        {
+            isFirstKeyPress = false;
+        };
+        
         parent.Controls.Add(numericUpDown);
         return numericUpDown;
     }
@@ -480,8 +716,8 @@ public partial class AddEditUmrahPackageForm : Form
         DateTimePicker datePicker = new DateTimePicker
         {
             Location = new Point(x, y),
-            Size = new Size(370, 30),
-            Font = new Font("Cairo", 10F),
+            Size = new Size(370, 35),
+            Font = new Font("Cairo", 11F),
             Format = DateTimePickerFormat.Short
         };
         parent.Controls.Add(datePicker);
@@ -493,9 +729,10 @@ public partial class AddEditUmrahPackageForm : Form
         ComboBox comboBox = new ComboBox
         {
             Location = new Point(x, y),
-            Size = new Size(width, 30),
-            Font = new Font("Cairo", 10F),
-            DropDownStyle = ComboBoxStyle.DropDownList
+            Size = new Size(width, 35),
+            Font = new Font("Cairo", 11F),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            FlatStyle = FlatStyle.Flat
         };
         parent.Controls.Add(comboBox);
         return comboBox;
@@ -506,9 +743,9 @@ public partial class AddEditUmrahPackageForm : Form
         Label label = new Label
         {
             Text = text,
-            Font = new Font("Cairo", 9F, FontStyle.Bold),
-            ForeColor = ColorScheme.TextSecondary,
-            Location = new Point(x, y + 5),
+            Font = new Font("Cairo", 10F, FontStyle.Bold),
+            ForeColor = ColorScheme.Info,
+            Location = new Point(x, y + 10),
             AutoSize = true
         };
         parent.Controls.Add(label);
@@ -533,7 +770,7 @@ public partial class AddEditUmrahPackageForm : Form
         Label label = new Label
         {
             Text = text,
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
+            Font = new Font("Cairo", 11F, FontStyle.Bold),
             ForeColor = ColorScheme.TextPrimary,
             Location = new Point(x, y),
             AutoSize = true
@@ -546,7 +783,7 @@ public partial class AddEditUmrahPackageForm : Form
         Label label = new Label
         {
             Text = text,
-            Font = new Font("Cairo", 12F, FontStyle.Bold),
+            Font = new Font("Cairo", 14F, FontStyle.Bold),
             ForeColor = color ?? ColorScheme.Primary,
             Location = new Point(x, y),
             AutoSize = true
@@ -565,16 +802,56 @@ public partial class AddEditUmrahPackageForm : Form
         CalculateTotals();
     }
     
+    private string GetRoomTypeDisplay(RoomType roomType)
+    {
+        // استخدام نفس القيم الموجودة في ComboBox تماماً
+        return roomType switch
+        {
+            RoomType.Single => "مفردة",
+            RoomType.Double => "ثنائي",
+            RoomType.Triple => "ثلاثي",
+            RoomType.Quad => "رباعي",
+            RoomType.Quint => "خماسي",
+            RoomType.Suite => "ثنائي", // تحويل Suite إلى ثنائي لأنه غير موجود في القائمة
+            _ => "ثنائي"
+        };
+    }
+    
+    private RoomType GetRoomTypeFromDisplay(string? display)
+    {
+        if (string.IsNullOrWhiteSpace(display))
+            return RoomType.Double;
+            
+        // التعامل مع كل الحالات الممكنة (عربي وإنجليزي)
+        return display.Trim() switch
+        {
+            "فردي" or "مفردة" or "Single" => RoomType.Single,
+            "مزدوج" or "ثنائي" or "Double" => RoomType.Double,
+            "ثلاثي" or "Triple" => RoomType.Triple,
+            "رباعي" or "Quad" => RoomType.Quad,
+            "خماسي" or "Quint" => RoomType.Quint,
+            "جناح" or "Suite" => RoomType.Double, // تحويل Suite إلى Double
+            _ => RoomType.Double
+        };
+    }
+    
     private void UpdatePilgrimsList()
     {
         int currentCount = (int)_numPersons.Value;
         
-        // Save current names
-        var currentNames = new List<string>();
+        // Save current data
+        var currentData = new List<(string name, string roomType, string roomNumber)>();
         for (int i = 0; i < _dgvPilgrims.Rows.Count; i++)
         {
             var nameCell = _dgvPilgrims.Rows[i].Cells["Name"].Value;
-            currentNames.Add(nameCell?.ToString() ?? "");
+            var roomTypeCell = _dgvPilgrims.Rows[i].Cells["RoomType"].Value;
+            var roomNumberCell = _dgvPilgrims.Rows[i].Cells["SharedRoomNumber"].Value;
+            
+            currentData.Add((
+                nameCell?.ToString() ?? "",
+                roomTypeCell?.ToString() ?? "",
+                roomNumberCell?.ToString() ?? ""
+            ));
         }
         
         // Clear and rebuild
@@ -582,9 +859,33 @@ public partial class AddEditUmrahPackageForm : Form
         
         for (int i = 0; i < currentCount; i++)
         {
-            string name = i < currentNames.Count ? currentNames[i] : "";
-            _dgvPilgrims.Rows.Add((i + 1).ToString(), name);
+            string name = i < currentData.Count ? currentData[i].name : "";
+            string roomType = i < currentData.Count && !string.IsNullOrWhiteSpace(currentData[i].roomType) 
+                ? NormalizeRoomType(currentData[i].roomType) 
+                : "ثنائي"; // القيمة الافتراضية بالعربي
+            string roomNumber = i < currentData.Count ? currentData[i].roomNumber : "";
+            
+            _dgvPilgrims.Rows.Add((i + 1).ToString(), name, roomType, roomNumber);
         }
+    }
+    
+    // دالة لتوحيد قيم نوع الغرفة لتطابق القائمة المتاحة
+    private string NormalizeRoomType(string roomType)
+    {
+        if (string.IsNullOrWhiteSpace(roomType))
+            return "ثنائي";
+            
+        // تحويل أي قيمة إلى واحدة من القيم الخمسة المتاحة
+        return roomType.Trim() switch
+        {
+            "فردي" or "مفردة" or "Single" => "مفردة",
+            "مزدوج" or "ثنائي" or "Double" => "ثنائي",
+            "ثلاثي" or "Triple" => "ثلاثي",
+            "رباعي" or "Quad" => "رباعي",
+            "خماسي" or "Quint" => "خماسي",
+            "جناح" or "Suite" => "ثنائي", // تحويل الجناح إلى ثنائي
+            _ => "ثنائي" // القيمة الافتراضية
+        };
     }
     
     // ══════════════════════════════════════════════════════════════════════════
@@ -598,6 +899,7 @@ public partial class AddEditUmrahPackageForm : Form
             decimal exchangeRate = _numExchangeRate.Value;
             decimal visaSAR = _numVisaPriceSAR.Value;
             decimal fastTrainSAR = _numFastTrainSAR.Value;
+            int numberOfPersons = (int)_numPersons.Value;
             
             // Convert SAR to EGP
             decimal visaEGP = visaSAR * exchangeRate;
@@ -618,11 +920,11 @@ public partial class AddEditUmrahPackageForm : Form
             _lblTotalCosts.Text = $"{totalCosts:N2} ج.م";
             
             // Total Revenue
-            decimal totalRevenue = _numSellingPrice.Value * _numPersons.Value;
+            decimal totalRevenue = _numSellingPrice.Value * numberOfPersons;
             _lblTotalRevenue.Text = $"{totalRevenue:N2} ج.م";
             
-            // Net Profit
-            decimal netProfit = totalRevenue - (totalCosts * _numPersons.Value);
+            // Net Profit (Total)
+            decimal netProfit = totalRevenue - (totalCosts * numberOfPersons);
             _lblNetProfit.Text = $"{netProfit:N2} ج.م";
             _lblNetProfit.ForeColor = netProfit >= 0 ? ColorScheme.Success : Color.FromArgb(211, 47, 47);
             
@@ -630,6 +932,11 @@ public partial class AddEditUmrahPackageForm : Form
             decimal profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue * 100) : 0;
             _lblProfitMargin.Text = $"{profitMargin:N2} %";
             _lblProfitMargin.ForeColor = profitMargin >= 0 ? ColorScheme.Info : Color.FromArgb(211, 47, 47);
+            
+            // Net Profit Per Person
+            decimal netProfitPerPerson = numberOfPersons > 0 ? (netProfit / numberOfPersons) : 0;
+            _lblNetProfitPerPerson.Text = $"{netProfitPerPerson:N2} ج.م";
+            _lblNetProfitPerPerson.ForeColor = netProfitPerPerson >= 0 ? Color.FromArgb(76, 175, 80) : Color.FromArgb(211, 47, 47);
         }
         catch
         {
@@ -712,7 +1019,34 @@ public partial class AddEditUmrahPackageForm : Form
                 int index = 1;
                 foreach (var pilgrim in package.Pilgrims.OrderBy(p => p.UmrahPilgrimId))
                 {
-                    _dgvPilgrims.Rows.Add(index.ToString(), pilgrim.FullName);
+                    // ✅ تحويل نوع الغرفة إلى عربي - يجب أن يطابق القيم في ComboBox
+                    string roomTypeDisplay = "ثنائي"; // القيمة الافتراضية
+                    
+                    if (pilgrim.RoomType.HasValue)
+                    {
+                        roomTypeDisplay = pilgrim.RoomType.Value switch
+                        {
+                            RoomType.Single => "مفردة",
+                            RoomType.Double => "ثنائي",
+                            RoomType.Triple => "ثلاثي",
+                            RoomType.Quad => "رباعي",
+                            RoomType.Quint => "خماسي",
+                            RoomType.Suite => "ثنائي", // تحويل الجناح إلى ثنائي (غير موجود في القائمة)
+                            _ => "ثنائي"
+                        };
+                    }
+                    
+                    Console.WriteLine($"🔍 Loading pilgrim: {pilgrim.FullName}, RoomType Enum: {pilgrim.RoomType}, Display: {roomTypeDisplay}");
+                    
+                    // إنشاء الصف مع تعيين القيمة العربية مباشرة
+                    int rowIndex = _dgvPilgrims.Rows.Add();
+                    DataGridViewRow row = _dgvPilgrims.Rows[rowIndex];
+                    
+                    row.Cells["Number"].Value = index.ToString();
+                    row.Cells["Name"].Value = pilgrim.FullName;
+                    row.Cells["RoomType"].Value = roomTypeDisplay; // ✅ القيمة العربية
+                    row.Cells["SharedRoomNumber"].Value = pilgrim.SharedRoomNumber ?? "";
+                    
                     index++;
                 }
             }
@@ -819,23 +1153,31 @@ public partial class AddEditUmrahPackageForm : Form
             for (int i = 0; i < _dgvPilgrims.Rows.Count; i++)
             {
                 var nameCell = _dgvPilgrims.Rows[i].Cells["Name"].Value;
+                var roomTypeCell = _dgvPilgrims.Rows[i].Cells["RoomType"].Value;
+                var roomNumberCell = _dgvPilgrims.Rows[i].Cells["SharedRoomNumber"].Value;
+                
                 string pilgrimName = nameCell?.ToString()?.Trim() ?? "";
+                string roomTypeDisplay = roomTypeCell?.ToString()?.Trim() ?? "ثنائي";
+                string sharedRoomNumber = roomNumberCell?.ToString()?.Trim() ?? "";
                 
                 if (!string.IsNullOrWhiteSpace(pilgrimName))
                 {
                     // Generate pilgrim number
                     string pilgrimNumber = $"UMP-{DateTime.UtcNow.Year}-{package.PackageNumber.Split('-').Last()}-{(i + 1):D2}";
                     
-                    // For updates: use existing packageId, for new: will be set by EF after save
-                    int packageIdForPilgrim = _packageId ?? 0;
+                    // Convert room type display to enum (handles both Arabic and English)
+                    RoomType pilgrimRoomType = GetRoomTypeFromDisplay(roomTypeDisplay);
+                    
+                    Console.WriteLine($"🔍 Pilgrim {i+1}: Name={pilgrimName}, DisplayType={roomTypeDisplay}, EnumType={pilgrimRoomType}");
                     
                     package.Pilgrims.Add(new UmrahPilgrim
                     {
                         PilgrimNumber = pilgrimNumber,
                         FullName = pilgrimName,
-                        // Don't set UmrahPackageId here - let EF handle it via navigation property
-                        TotalAmount = _numSellingPrice.Value, // Set to selling price
-                        PaidAmount = 0, // Initially unpaid
+                        RoomType = pilgrimRoomType,
+                        SharedRoomNumber = string.IsNullOrWhiteSpace(sharedRoomNumber) ? null : sharedRoomNumber,
+                        TotalAmount = _numSellingPrice.Value,
+                        PaidAmount = 0,
                         CreatedBy = _currentUserId,
                         RegisteredAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow,

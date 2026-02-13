@@ -6,6 +6,7 @@ namespace GraceWay.AccountingSystem.Domain.Entities;
 /// <summary>
 /// المعتمر (كل فرد في الرحلة)
 /// </summary>
+[Table("umrahpilgrims")]
 public class UmrahPilgrim
 {
     [Key]
@@ -47,6 +48,19 @@ public class UmrahPilgrim
     /// العمر
     /// </summary>
     public int? Age { get; set; }
+    
+    /// <summary>
+    /// نوع الغرفة الخاص بالمعتمر
+    /// </summary>
+    [Column("roomtype")]
+    public RoomType? RoomType { get; set; }
+    
+    /// <summary>
+    /// رقم الغرفة المشتركة (لربط المعتمرين في نفس الغرفة)
+    /// مثال: "R001" - جميع المعتمرين بنفس رقم الغرفة يشتركون في غرفة واحدة
+    /// </summary>
+    [MaxLength(20)]
+    public string? SharedRoomNumber { get; set; }
     
     // ══════════════════════════════════════
     // المدفوعات

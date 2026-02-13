@@ -241,6 +241,7 @@ static class Program
         services.AddTransient<UmrahPackagesListForm>();
         services.AddTransient<AddEditUmrahPackageForm>();
         services.AddTransient<BackupManagementForm>();
+        services.AddTransient<ActiveSessionsForm>();
         
         Console.WriteLine("  - Building ServiceProvider...");
         ServiceProvider = services.BuildServiceProvider();

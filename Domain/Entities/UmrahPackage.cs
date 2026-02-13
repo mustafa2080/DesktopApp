@@ -6,6 +6,7 @@ namespace GraceWay.AccountingSystem.Domain.Entities;
 /// <summary>
 /// حزمة العمرة
 /// </summary>
+[Table("umrahpackages")]
 public class UmrahPackage
 {
     [Key]
@@ -41,6 +42,7 @@ public class UmrahPackage
     /// نوع الغرفة
     /// </summary>
     [Required]
+    [Column("roomtype")]
     public RoomType RoomType { get; set; }
     
     // ══════════════════════════════════════

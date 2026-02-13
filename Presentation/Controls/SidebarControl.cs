@@ -108,6 +108,7 @@ public class SidebarControl : Panel
         AddMenuItem("settings", "⚙️", "الإعدادات", ref yPosition);
         AddMenuItem("users", "👤", "إدارة المستخدمين", ref yPosition);
         AddMenuItem("audit", "📜", "سجل العمليات", ref yPosition);
+        AddMenuItem("sessions", "🔗", "الجلسات النشطة", ref yPosition);
         AddMenuItem("accounts", "🌳", "شجرة الحسابات", ref yPosition);
         AddSeparator(ref yPosition);
         AddMenuItem("customers", "👥", "العملاء", ref yPosition);
@@ -335,6 +336,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("settings", true, true);
             SetMenuItemEnabled("users", true, true);
             SetMenuItemEnabled("audit", true, true); // ✅ Audit for admins
+            SetMenuItemEnabled("sessions", true, true); // ✅ Sessions for admins ONLY
             SetMenuItemEnabled("flights", true, true);
             SetMenuItemEnabled("umrah", true, true);
             SetMenuItemEnabled("trips", true, true);
@@ -368,6 +370,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("settings", true, false);
             SetMenuItemEnabled("users", true, false);
             SetMenuItemEnabled("audit", true, false);
+            SetMenuItemEnabled("sessions", false, false); // ❌ HIDE for non-admins
             SetMenuItemEnabled("trips", true, false);
             SetMenuItemEnabled("reservations", true, false);
             SetMenuItemEnabled("customers", true, false);
@@ -398,6 +401,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("settings", true, false);
             SetMenuItemEnabled("users", true, false);
             SetMenuItemEnabled("audit", true, false);
+            SetMenuItemEnabled("sessions", false, false); // ❌ HIDE for non-admins
             SetMenuItemEnabled("flights", true, false);
             SetMenuItemEnabled("umrah", true, false);
             SetMenuItemEnabled("reservations", true, false);
@@ -435,6 +439,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("settings", true, false);
             SetMenuItemEnabled("users", true, false);
             SetMenuItemEnabled("audit", true, false);
+            SetMenuItemEnabled("sessions", false, false); // ❌ HIDE for non-admins
             SetMenuItemEnabled("flights", true, false);
             SetMenuItemEnabled("umrah", true, false);
             SetMenuItemEnabled("trips", true, false);
@@ -455,6 +460,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("settings", true, false);
             SetMenuItemEnabled("users", true, false);
             SetMenuItemEnabled("audit", true, false);
+            SetMenuItemEnabled("sessions", false, false); // ❌ HIDE for non-admins
             SetMenuItemEnabled("flights", true, false);
             SetMenuItemEnabled("umrah", true, false);
             SetMenuItemEnabled("trips", true, false);

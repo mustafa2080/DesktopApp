@@ -26,6 +26,13 @@ public partial class UmrahProfitabilityReport : Form
     // Data Grid
     private DataGridView _profitGrid = null!;
     
+    // Detail Grid - تفاصيل الحسابات
+    private DataGridView _detailGrid = null!;
+    private Label _detailTitleLabel = null!;
+    private Button _exportDetailsButton = null!;
+    private SplitContainer _splitContainer = null!;
+    private UmrahPackage? _selectedPackage = null;
+    
     public UmrahProfitabilityReport(IUmrahService umrahService, IExportService exportService)
     {
         _umrahService = umrahService;
@@ -62,12 +69,16 @@ public partial class UmrahProfitabilityReport : Form
         };
         headerPanel.Paint += (s, e) =>
         {
-            using var brush = new LinearGradientBrush(
-                headerPanel.ClientRectangle,
-                Color.FromArgb(52, 152, 219),
-                Color.FromArgb(41, 128, 185),
-                LinearGradientMode.Horizontal);
-            e.Graphics.FillRectangle(brush, headerPanel.ClientRectangle);
+            // فحص أن المستطيل له أبعاد صحيحة قبل إنشاء الـ gradient
+            if (headerPanel.ClientRectangle.Width > 0 && headerPanel.ClientRectangle.Height > 0)
+            {
+                using var brush = new LinearGradientBrush(
+                    headerPanel.ClientRectangle,
+                    Color.FromArgb(52, 152, 219),
+                    Color.FromArgb(41, 128, 185),
+                    LinearGradientMode.Horizontal);
+                e.Graphics.FillRectangle(brush, headerPanel.ClientRectangle);
+            }
         };
         
         // Title with Icon
@@ -227,7 +238,7 @@ public partial class UmrahProfitabilityReport : Form
         _dashboardPanel.Controls.Add(cardsFlow);
         
         // ═══════════════════════════════════════════
-        // Data Grid Panel
+        // Data Grid Panel with Split Container
         // ═══════════════════════════════════════════
         Panel gridPanel = new Panel
         {
@@ -236,6 +247,18 @@ public partial class UmrahProfitabilityReport : Form
             BackColor = Color.Transparent
         };
         
+        _splitContainer = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Horizontal,
+            SplitterDistance = 350,
+            SplitterWidth = 6,
+            BackColor = Color.FromArgb(220, 225, 230)
+        };
+        
+        // ═══════════════════════════════════════════
+        // Top Panel: Summary Grid
+        // ═══════════════════════════════════════════
         _profitGrid = new DataGridView
         {
             Dock = DockStyle.Fill,
@@ -372,7 +395,181 @@ public partial class UmrahProfitabilityReport : Form
         // Color-code profit cells
         _profitGrid.CellFormatting += ProfitGrid_CellFormatting;
         
-        gridPanel.Controls.Add(_profitGrid);
+        // Row selection event → show details
+        _profitGrid.SelectionChanged += ProfitGrid_SelectionChanged;
+        
+        _splitContainer.Panel1.Controls.Add(_profitGrid);
+        
+        // ═══════════════════════════════════════════
+        // Bottom Panel: Detail Cost Breakdown
+        // ═══════════════════════════════════════════
+        Panel detailPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.White,
+            Padding = new Padding(0)
+        };
+        
+        // Detail Header Panel - يحتوي على العنوان والزر
+        Panel detailHeaderPanel = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = Color.FromArgb(41, 128, 185)
+        };
+        
+        // Detail title
+        _detailTitleLabel = new Label
+        {
+            Text = "📋 تفاصيل حسابات الرحلة — اضغط على حزمة لعرض التفاصيل",
+            Font = new Font("Cairo", 12F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.Transparent,
+            AutoSize = false,
+            Height = 40,
+            TextAlign = ContentAlignment.MiddleRight,
+            Padding = new Padding(15, 0, 180, 0),
+            Dock = DockStyle.Fill
+        };
+        detailHeaderPanel.Controls.Add(_detailTitleLabel);
+        
+        // Export Details Button
+        _exportDetailsButton = new Button
+        {
+            Text = "📥 تصدير التفاصيل",
+            Font = new Font("Cairo", 9F, FontStyle.Bold),
+            Size = new Size(160, 30),
+            BackColor = Color.FromArgb(46, 204, 113),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand,
+            Enabled = false  // معطل في البداية
+        };
+        _exportDetailsButton.FlatAppearance.BorderSize = 0;
+        _exportDetailsButton.Click += ExportDetailsToExcel_Click;
+        
+        // وضع الزر على اليسار
+        detailHeaderPanel.Resize += (s, e) => 
+        {
+            _exportDetailsButton.Location = new Point(10, 5);
+        };
+        _exportDetailsButton.Location = new Point(10, 5);
+        
+        detailHeaderPanel.Controls.Add(_exportDetailsButton);
+        
+        _detailGrid = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.None,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            MultiSelect = false,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            RowHeadersVisible = false,
+            Font = new Font("Cairo", 10F),
+            ColumnHeadersHeight = 40,
+            RowTemplate = { Height = 38 },
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.FromArgb(52, 73, 94),
+                ForeColor = Color.White,
+                Font = new Font("Cairo", 10F, FontStyle.Bold),
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Padding = new Padding(5)
+            },
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                SelectionBackColor = Color.FromArgb(174, 214, 241),
+                SelectionForeColor = Color.Black,
+                Padding = new Padding(5)
+            },
+            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.FromArgb(245, 248, 250)
+            }
+        };
+        
+        // Detail columns
+        _detailGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "DetailItem",
+            HeaderText = "البند",
+            MinimumWidth = 250,
+            FillWeight = 35,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Cairo", 10F, FontStyle.Bold),
+                Alignment = DataGridViewContentAlignment.MiddleRight
+            }
+        });
+        
+        _detailGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "DetailValuePerPerson",
+            HeaderText = "تكلفة الفرد (ج.م)",
+            MinimumWidth = 160,
+            FillWeight = 20,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Format = "N2",
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Font = new Font("Cairo", 10F)
+            }
+        });
+        
+        _detailGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "DetailTotal",
+            HeaderText = "الإجمالي (ج.م)",
+            MinimumWidth = 160,
+            FillWeight = 20,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Format = "N2",
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Font = new Font("Cairo", 10F, FontStyle.Bold)
+            }
+        });
+        
+        _detailGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "DetailPercentage",
+            HeaderText = "النسبة %",
+            MinimumWidth = 120,
+            FillWeight = 15,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Format = "N2",
+                Alignment = DataGridViewContentAlignment.MiddleCenter
+            }
+        });
+        
+        _detailGrid.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "DetailNotes",
+            HeaderText = "ملاحظات",
+            MinimumWidth = 200,
+            FillWeight = 10,
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                Font = new Font("Cairo", 9F),
+                ForeColor = Color.Gray,
+                Alignment = DataGridViewContentAlignment.MiddleRight
+            }
+        });
+        
+        // Color-code detail rows
+        _detailGrid.CellFormatting += DetailGrid_CellFormatting;
+        
+        detailPanel.Controls.Add(_detailGrid);
+        detailPanel.Controls.Add(detailHeaderPanel);
+        
+        _splitContainer.Panel2.Controls.Add(detailPanel);
+        
+        gridPanel.Controls.Add(_splitContainer);
         
         // IMPORTANT: Add controls in reverse order for proper docking
         // (Fill controls first, then Top controls)
@@ -764,13 +961,553 @@ public partial class UmrahProfitabilityReport : Form
         Console.WriteLine($"✅ Grid updated with {_profitGrid.Rows.Count} rows");
     }
     
+    // ═══════════════════════════════════════════
+    // Detail Panel - تفاصيل حسابات الحزمة
+    // ═══════════════════════════════════════════
+    private void ProfitGrid_SelectionChanged(object? sender, EventArgs e)
+    {
+        if (_profitGrid.SelectedRows.Count == 0 || _currentPackages == null) return;
+        
+        var selectedRow = _profitGrid.SelectedRows[0];
+        var packageNumber = selectedRow.Cells["PackageNumber"].Value?.ToString();
+        
+        if (string.IsNullOrEmpty(packageNumber)) return;
+        
+        var package = _currentPackages.FirstOrDefault(p => p.PackageNumber == packageNumber);
+        if (package != null)
+        {
+            ShowPackageDetails(package);
+        }
+    }
+    
+    private void ShowPackageDetails(UmrahPackage package)
+    {
+        // حفظ الباكج المختارة
+        _selectedPackage = package;
+        
+        // تفعيل زر التصدير
+        _exportDetailsButton.Enabled = true;
+        
+        _detailGrid.Rows.Clear();
+        
+        // Update title
+        _detailTitleLabel.Text = $"📋 تفاصيل حسابات: {package.PackageNumber} — {package.TripName} ({package.NumberOfPersons} أفراد)";
+        
+        int persons = package.NumberOfPersons;
+        decimal totalCostPerPerson = package.TotalCosts;
+        decimal totalCostAll = totalCostPerPerson * persons;
+        
+        // ═══════════════════════════════════════════
+        // قسم الإيرادات
+        // ═══════════════════════════════════════════
+        int hdrRow = _detailGrid.Rows.Add("💰 الإيرادات", "", "", "", "");
+        _detailGrid.Rows[hdrRow].DefaultCellStyle.BackColor = Color.FromArgb(46, 204, 113);
+        _detailGrid.Rows[hdrRow].DefaultCellStyle.ForeColor = Color.White;
+        _detailGrid.Rows[hdrRow].DefaultCellStyle.Font = new Font("Cairo", 11F, FontStyle.Bold);
+        
+        _detailGrid.Rows.Add(
+            "  💵 سعر البيع للفرد",
+            package.SellingPrice,
+            package.SellingPrice * persons,
+            100m,
+            $"سعر البيع × {persons} فرد"
+        );
+        
+        // ═══════════════════════════════════════════
+        // قسم التكاليف
+        // ═══════════════════════════════════════════
+        hdrRow = _detailGrid.Rows.Add("💸 التكاليف", "", "", "", "");
+        _detailGrid.Rows[hdrRow].DefaultCellStyle.BackColor = Color.FromArgb(231, 76, 60);
+        _detailGrid.Rows[hdrRow].DefaultCellStyle.ForeColor = Color.White;
+        _detailGrid.Rows[hdrRow].DefaultCellStyle.Font = new Font("Cairo", 11F, FontStyle.Bold);
+        
+        // Helper function to avoid division by zero
+        decimal CostPct(decimal val) => totalCostPerPerson > 0 ? (val / totalCostPerPerson * 100) : 0;
+        
+        // 1. تكلفة التأشيرة
+        _detailGrid.Rows.Add(
+            "  🪪 تكلفة التأشيرة",
+            package.VisaPriceEGP,
+            package.VisaPriceEGP * persons,
+            CostPct(package.VisaPriceEGP),
+            $"{package.VisaPriceSAR:N2} ريال × {package.SARExchangeRate:N2}"
+        );
+        
+        // 2. تكلفة الإقامة
+        _detailGrid.Rows.Add(
+            "  🏨 تكلفة الإقامة",
+            package.AccommodationTotal,
+            package.AccommodationTotal * persons,
+            CostPct(package.AccommodationTotal),
+            $"مكة: {package.MakkahHotel} ({package.MakkahNights} ليالي) — المدينة: {package.MadinahHotel} ({package.MadinahNights} ليالي)"
+        );
+        
+        // 3. تكلفة الباركود
+        if (package.BarcodePrice > 0)
+        {
+            _detailGrid.Rows.Add(
+                "  📱 تكلفة الباركود",
+                package.BarcodePrice,
+                package.BarcodePrice * persons,
+                CostPct(package.BarcodePrice),
+                ""
+            );
+        }
+        
+        // 4. تكلفة الطيران
+        if (package.FlightPrice > 0)
+        {
+            _detailGrid.Rows.Add(
+                "  ✈️ تكلفة الطيران",
+                package.FlightPrice,
+                package.FlightPrice * persons,
+                CostPct(package.FlightPrice),
+                $"وسيلة السفر: {package.TransportMethod}"
+            );
+        }
+        
+        // 5. تكلفة القطار السريع
+        if (package.FastTrainPriceSAR > 0)
+        {
+            _detailGrid.Rows.Add(
+                "  🚄 القطار السريع",
+                package.FastTrainPriceEGP,
+                package.FastTrainPriceEGP * persons,
+                CostPct(package.FastTrainPriceEGP),
+                $"{package.FastTrainPriceSAR:N2} ريال × {package.SARExchangeRate:N2}"
+            );
+        }
+        
+        // 6. العمولة
+        if (package.Commission > 0)
+        {
+            _detailGrid.Rows.Add(
+                "  🤝 العمولة",
+                package.Commission,
+                package.Commission * persons,
+                CostPct(package.Commission),
+                !string.IsNullOrEmpty(package.BrokerName) ? $"الوسيط: {package.BrokerName}" : ""
+            );
+        }
+        
+        // 7. مصاريف المشرف
+        if (package.SupervisorExpenses > 0)
+        {
+            _detailGrid.Rows.Add(
+                "  👤 مصاريف المشرف",
+                package.SupervisorExpenses,
+                package.SupervisorExpenses * persons,
+                CostPct(package.SupervisorExpenses),
+                !string.IsNullOrEmpty(package.SupervisorName) ? $"المشرف: {package.SupervisorName}" : ""
+            );
+        }
+        
+        // ═══════════════════════════════════════════
+        // إجمالي التكاليف
+        // ═══════════════════════════════════════════
+        int totalRow = _detailGrid.Rows.Add(
+            "📊 إجمالي التكاليف للفرد",
+            totalCostPerPerson,
+            totalCostAll,
+            100m,
+            $"{persons} فرد × {totalCostPerPerson:N2} = {totalCostAll:N2}"
+        );
+        _detailGrid.Rows[totalRow].DefaultCellStyle.BackColor = Color.FromArgb(255, 205, 210);
+        _detailGrid.Rows[totalRow].DefaultCellStyle.Font = new Font("Cairo", 11F, FontStyle.Bold);
+        
+        // ═══════════════════════════════════════════
+        // سطر فارغ
+        // ═══════════════════════════════════════════
+        _detailGrid.Rows.Add("", "", "", "", "");
+        
+        // ═══════════════════════════════════════════
+        // إجمالي الإيرادات
+        // ═══════════════════════════════════════════
+        int revRow = _detailGrid.Rows.Add(
+            "💵 إجمالي الإيرادات",
+            package.SellingPrice,
+            package.TotalRevenue,
+            "",
+            $"{persons} فرد × {package.SellingPrice:N2}"
+        );
+        _detailGrid.Rows[revRow].DefaultCellStyle.BackColor = Color.FromArgb(200, 230, 201);
+        _detailGrid.Rows[revRow].DefaultCellStyle.Font = new Font("Cairo", 11F, FontStyle.Bold);
+        
+        // ═══════════════════════════════════════════
+        // صافي الربح
+        // ═══════════════════════════════════════════
+        int profitRow = _detailGrid.Rows.Add(
+            "💎 صافي الربح",
+            package.NetProfitPerPerson,
+            package.NetProfit,
+            package.ProfitMargin,
+            package.NetProfit >= 0 ? "✅ ربح" : "❌ خسارة"
+        );
+        Color profitColor = package.NetProfit >= 0 ? Color.FromArgb(46, 204, 113) : Color.FromArgb(231, 76, 60);
+        _detailGrid.Rows[profitRow].DefaultCellStyle.BackColor = profitColor;
+        _detailGrid.Rows[profitRow].DefaultCellStyle.ForeColor = Color.White;
+        _detailGrid.Rows[profitRow].DefaultCellStyle.Font = new Font("Cairo", 13F, FontStyle.Bold);
+        
+        // ═══════════════════════════════════════════
+        // معلومات إضافية
+        // ═══════════════════════════════════════════
+        hdrRow = _detailGrid.Rows.Add("📝 معلومات إضافية", "", "", "", "");
+        _detailGrid.Rows[hdrRow].DefaultCellStyle.BackColor = Color.FromArgb(52, 73, 94);
+        _detailGrid.Rows[hdrRow].DefaultCellStyle.ForeColor = Color.White;
+        _detailGrid.Rows[hdrRow].DefaultCellStyle.Font = new Font("Cairo", 11F, FontStyle.Bold);
+        
+        _detailGrid.Rows.Add("  🏷️ نوع الغرفة", "", "", "", package.GetRoomTypeDisplay());
+        _detailGrid.Rows.Add("  🏨 إجمالي الليالي", "", "", "", $"{package.TotalNights} ليلة (مكة: {package.MakkahNights} + المدينة: {package.MadinahNights})");
+        _detailGrid.Rows.Add("  🚌 وسيلة السفر", "", "", "", package.TransportMethod);
+        _detailGrid.Rows.Add("  💱 سعر صرف الريال", "", "", "", $"{package.SARExchangeRate:N2} ج.م");
+        _detailGrid.Rows.Add("  📋 الحالة", "", "", "", package.GetStatusDisplay());
+        
+        if (!string.IsNullOrEmpty(package.Notes))
+        {
+            _detailGrid.Rows.Add("  📌 ملاحظات", "", "", "", package.Notes);
+        }
+    }
+    
+    private void DetailGrid_CellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+    {
+        // No additional formatting needed — already handled inline
+    }
+    
     private void ExportToExcel_Click(object? sender, EventArgs e)
     {
         try
         {
-            if (_profitGrid.Rows.Count == 0)
+            if (_currentPackages == null || !_currentPackages.Any())
             {
                 MessageBox.Show("لا توجد بيانات للتصدير!", "تنبيه",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // تحديد الحزم المعروضة حالياً
+            List<UmrahPackage> packagesToExport;
+            if (_showAllCheckBox.Checked)
+            {
+                packagesToExport = _currentPackages.OrderByDescending(p => p.NetProfit).ToList();
+            }
+            else
+            {
+                var startDate = _startDatePicker.Value.Date;
+                var endDate = _endDatePicker.Value.Date.AddDays(1).AddSeconds(-1);
+                packagesToExport = _currentPackages
+                    .Where(p => p.Date.Date >= startDate && p.Date.Date <= endDate)
+                    .OrderByDescending(p => p.NetProfit)
+                    .ToList();
+            }
+
+            if (!packagesToExport.Any())
+            {
+                MessageBox.Show("لا توجد حزم في النطاق الزمني المحدد!", "تنبيه",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            using var saveDialog = new SaveFileDialog
+            {
+                Filter = "Excel Files|*.xlsx",
+                Title = "حفظ تقرير ربحية العمرة - تفاصيل الحسابات",
+                FileName = $"تفاصيل_حسابات_العمرة_{DateTime.Now:yyyy-MM-dd_HHmm}.xlsx"
+            };
+
+            if (saveDialog.ShowDialog() != DialogResult.OK)
+                return;
+
+            using var workbook = new ClosedXML.Excel.XLWorkbook();
+
+            // ═══════════════════════════════════════════
+            // ورقة واحدة لكل حزمة (تفاصيل حسابات)
+            // ═══════════════════════════════════════════
+            foreach (var package in packagesToExport)
+            {
+                // اسم الورقة: رقم الحزمة (مع تنظيف الرموز غير المسموح بها)
+                string sheetName = package.PackageNumber
+                    .Replace("/", "-").Replace("\\", "-").Replace("*", "")
+                    .Replace("[", "").Replace("]", "").Replace(":", "-")
+                    .Replace("?", "");
+                if (sheetName.Length > 31) sheetName = sheetName.Substring(0, 31);
+
+                var ws = workbook.Worksheets.Add(sheetName);
+
+                int persons = package.NumberOfPersons;
+                decimal totalCostPerPerson = package.TotalCosts;
+
+                // ─── العنوان الرئيسي ───
+                ws.Cell(1, 1).Value = "تفاصيل حسابات حزمة العمرة";
+                ws.Cell(1, 1).Style.Font.Bold = true;
+                ws.Cell(1, 1).Style.Font.FontSize = 18;
+                ws.Cell(1, 1).Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(41, 128, 185);
+                ws.Cell(1, 1).Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+                ws.Range(1, 1, 1, 5).Merge();
+                ws.Range(1, 1, 1, 5).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+
+                // ─── معلومات الحزمة ───
+                ws.Cell(2, 1).Value = $"رقم الحزمة: {package.PackageNumber}";
+                ws.Range(2, 1, 2, 2).Merge();
+                ws.Cell(2, 3).Value = $"اسم الرحلة: {package.TripName}";
+                ws.Range(2, 3, 2, 5).Merge();
+
+                ws.Cell(3, 1).Value = $"عدد الأفراد: {persons}";
+                ws.Range(3, 1, 3, 2).Merge();
+                ws.Cell(3, 3).Value = $"التاريخ: {package.Date:yyyy-MM-dd}";
+                ws.Range(3, 3, 3, 5).Merge();
+
+                ws.Cell(4, 1).Value = $"الحالة: {GetStatusArabic(package.Status)}";
+                ws.Range(4, 1, 4, 2).Merge();
+                ws.Cell(4, 3).Value = $"سعر صرف الريال: {package.SARExchangeRate:N2} ج.م";
+                ws.Range(4, 3, 4, 5).Merge();
+
+                // ─── رؤوس الأعمدة ───
+                int headerRow = 6;
+                string[] headers = { "البند", "تكلفة الفرد (ج.م)", "الإجمالي (ج.م)", "النسبة %", "ملاحظات" };
+                for (int i = 0; i < headers.Length; i++)
+                    ws.Cell(headerRow, i + 1).Value = headers[i];
+
+                var headerRange = ws.Range(headerRow, 1, headerRow, 5);
+                headerRange.Style.Font.Bold = true;
+                headerRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(52, 73, 94);
+                headerRange.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+                headerRange.Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+
+                int row = headerRow + 1;
+
+                // ─── قسم الإيرادات ───
+                ws.Cell(row, 1).Value = "💰 الإيرادات";
+                var revHdrRange = ws.Range(row, 1, row, 5);
+                revHdrRange.Style.Font.Bold = true;
+                revHdrRange.Style.Font.FontSize = 12;
+                revHdrRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(46, 204, 113);
+                revHdrRange.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+                row++;
+
+                ws.Cell(row, 1).Value = "  💵 سعر البيع للفرد";
+                ws.Cell(row, 2).Value = package.SellingPrice;
+                ws.Cell(row, 3).Value = package.SellingPrice * persons;
+                ws.Cell(row, 4).Value = 100m;
+                ws.Cell(row, 5).Value = $"سعر البيع × {persons} فرد";
+                row++;
+
+                // ─── قسم التكاليف ───
+                ws.Cell(row, 1).Value = "💸 التكاليف";
+                var costHdrRange = ws.Range(row, 1, row, 5);
+                costHdrRange.Style.Font.Bold = true;
+                costHdrRange.Style.Font.FontSize = 12;
+                costHdrRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(231, 76, 60);
+                costHdrRange.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+                row++;
+
+                decimal CostPct(decimal val) => totalCostPerPerson > 0 ? (val / totalCostPerPerson * 100) : 0;
+
+                // تكلفة التأشيرة
+                ws.Cell(row, 1).Value = "  🪪 تكلفة التأشيرة";
+                ws.Cell(row, 2).Value = package.VisaPriceEGP;
+                ws.Cell(row, 3).Value = package.VisaPriceEGP * persons;
+                ws.Cell(row, 4).Value = CostPct(package.VisaPriceEGP);
+                ws.Cell(row, 5).Value = $"{package.VisaPriceSAR:N2} ريال × {package.SARExchangeRate:N2}";
+                row++;
+
+                // تكلفة الإقامة
+                ws.Cell(row, 1).Value = "  🏨 تكلفة الإقامة";
+                ws.Cell(row, 2).Value = package.AccommodationTotal;
+                ws.Cell(row, 3).Value = package.AccommodationTotal * persons;
+                ws.Cell(row, 4).Value = CostPct(package.AccommodationTotal);
+                ws.Cell(row, 5).Value = $"مكة: {package.MakkahHotel} ({package.MakkahNights} ليالي) — المدينة: {package.MadinahHotel} ({package.MadinahNights} ليالي)";
+                row++;
+
+                // تكلفة الباركود
+                if (package.BarcodePrice > 0)
+                {
+                    ws.Cell(row, 1).Value = "  📱 تكلفة الباركود";
+                    ws.Cell(row, 2).Value = package.BarcodePrice;
+                    ws.Cell(row, 3).Value = package.BarcodePrice * persons;
+                    ws.Cell(row, 4).Value = CostPct(package.BarcodePrice);
+                    ws.Cell(row, 5).Value = "";
+                    row++;
+                }
+
+                // تكلفة الطيران
+                if (package.FlightPrice > 0)
+                {
+                    ws.Cell(row, 1).Value = "  ✈️ تكلفة الطيران";
+                    ws.Cell(row, 2).Value = package.FlightPrice;
+                    ws.Cell(row, 3).Value = package.FlightPrice * persons;
+                    ws.Cell(row, 4).Value = CostPct(package.FlightPrice);
+                    ws.Cell(row, 5).Value = $"وسيلة السفر: {package.TransportMethod}";
+                    row++;
+                }
+
+                // القطار السريع
+                if (package.FastTrainPriceSAR > 0)
+                {
+                    ws.Cell(row, 1).Value = "  🚄 القطار السريع";
+                    ws.Cell(row, 2).Value = package.FastTrainPriceEGP;
+                    ws.Cell(row, 3).Value = package.FastTrainPriceEGP * persons;
+                    ws.Cell(row, 4).Value = CostPct(package.FastTrainPriceEGP);
+                    ws.Cell(row, 5).Value = $"{package.FastTrainPriceSAR:N2} ريال × {package.SARExchangeRate:N2}";
+                    row++;
+                }
+
+                // العمولة
+                if (package.Commission > 0)
+                {
+                    ws.Cell(row, 1).Value = "  🤝 العمولة";
+                    ws.Cell(row, 2).Value = package.Commission;
+                    ws.Cell(row, 3).Value = package.Commission * persons;
+                    ws.Cell(row, 4).Value = CostPct(package.Commission);
+                    ws.Cell(row, 5).Value = !string.IsNullOrEmpty(package.BrokerName) ? $"الوسيط: {package.BrokerName}" : "";
+                    row++;
+                }
+
+                // مصاريف المشرف
+                if (package.SupervisorExpenses > 0)
+                {
+                    ws.Cell(row, 1).Value = "  👤 مصاريف المشرف";
+                    ws.Cell(row, 2).Value = package.SupervisorExpenses;
+                    ws.Cell(row, 3).Value = package.SupervisorExpenses * persons;
+                    ws.Cell(row, 4).Value = CostPct(package.SupervisorExpenses);
+                    ws.Cell(row, 5).Value = !string.IsNullOrEmpty(package.SupervisorName) ? $"المشرف: {package.SupervisorName}" : "";
+                    row++;
+                }
+
+                // ─── إجمالي التكاليف ───
+                ws.Cell(row, 1).Value = "📊 إجمالي التكاليف للفرد";
+                ws.Cell(row, 2).Value = totalCostPerPerson;
+                ws.Cell(row, 3).Value = totalCostPerPerson * persons;
+                ws.Cell(row, 4).Value = 100m;
+                ws.Cell(row, 5).Value = $"{persons} فرد × {totalCostPerPerson:N2} = {totalCostPerPerson * persons:N2}";
+                var totalCostRange = ws.Range(row, 1, row, 5);
+                totalCostRange.Style.Font.Bold = true;
+                totalCostRange.Style.Font.FontSize = 11;
+                totalCostRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(255, 205, 210);
+                row++;
+
+                // ─── سطر فارغ ───
+                row++;
+
+                // ─── إجمالي الإيرادات ───
+                ws.Cell(row, 1).Value = "💵 إجمالي الإيرادات";
+                ws.Cell(row, 2).Value = package.SellingPrice;
+                ws.Cell(row, 3).Value = package.TotalRevenue;
+                ws.Cell(row, 4).Value = "";
+                ws.Cell(row, 5).Value = $"{persons} فرد × {package.SellingPrice:N2}";
+                var totalRevRange = ws.Range(row, 1, row, 5);
+                totalRevRange.Style.Font.Bold = true;
+                totalRevRange.Style.Font.FontSize = 11;
+                totalRevRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(200, 230, 201);
+                row++;
+
+                // ─── صافي الربح ───
+                ws.Cell(row, 1).Value = "💎 صافي الربح";
+                ws.Cell(row, 2).Value = package.NetProfitPerPerson;
+                ws.Cell(row, 3).Value = package.NetProfit;
+                ws.Cell(row, 4).Value = package.ProfitMargin;
+                ws.Cell(row, 5).Value = package.NetProfit >= 0 ? "✅ ربح" : "❌ خسارة";
+                var profitRange = ws.Range(row, 1, row, 5);
+                profitRange.Style.Font.Bold = true;
+                profitRange.Style.Font.FontSize = 13;
+                profitRange.Style.Fill.BackgroundColor = package.NetProfit >= 0
+                    ? ClosedXML.Excel.XLColor.FromArgb(46, 204, 113)
+                    : ClosedXML.Excel.XLColor.FromArgb(231, 76, 60);
+                profitRange.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+                row++;
+
+                // ─── سطر فارغ ───
+                row++;
+
+                // ─── معلومات إضافية ───
+                ws.Cell(row, 1).Value = "📝 معلومات إضافية";
+                var infoHdrRange = ws.Range(row, 1, row, 5);
+                infoHdrRange.Style.Font.Bold = true;
+                infoHdrRange.Style.Font.FontSize = 12;
+                infoHdrRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(52, 73, 94);
+                infoHdrRange.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+                row++;
+
+                ws.Cell(row, 1).Value = "  🏷️ نوع الغرفة";
+                ws.Cell(row, 5).Value = package.GetRoomTypeDisplay();
+                row++;
+
+                ws.Cell(row, 1).Value = "  🏨 إجمالي الليالي";
+                ws.Cell(row, 5).Value = $"{package.TotalNights} ليلة (مكة: {package.MakkahNights} + المدينة: {package.MadinahNights})";
+                row++;
+
+                ws.Cell(row, 1).Value = "  🚌 وسيلة السفر";
+                ws.Cell(row, 5).Value = package.TransportMethod;
+                row++;
+
+                ws.Cell(row, 1).Value = "  💱 سعر صرف الريال";
+                ws.Cell(row, 5).Value = $"{package.SARExchangeRate:N2} ج.م";
+                row++;
+
+                ws.Cell(row, 1).Value = "  📋 الحالة";
+                ws.Cell(row, 5).Value = package.GetStatusDisplay();
+                row++;
+
+                if (!string.IsNullOrEmpty(package.Notes))
+                {
+                    ws.Cell(row, 1).Value = "  📌 ملاحظات";
+                    ws.Cell(row, 5).Value = package.Notes;
+                    row++;
+                }
+
+                // ─── تنسيق الأعمدة ───
+                ws.Column(1).Width = 35;
+                ws.Column(2).Width = 22;
+                ws.Column(3).Width = 22;
+                ws.Column(4).Width = 15;
+                ws.Column(5).Width = 45;
+
+                ws.Column(2).Style.NumberFormat.Format = "#,##0.00";
+                ws.Column(3).Style.NumberFormat.Format = "#,##0.00";
+                ws.Column(4).Style.NumberFormat.Format = "0.00";
+
+                ws.Column(1).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Right;
+                ws.Column(2).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+                ws.Column(3).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+                ws.Column(4).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+                ws.Column(5).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Right;
+
+                // تنسيق معلومات الحزمة في الأعلى
+                ws.Range(2, 1, 4, 5).Style.Font.Bold = true;
+                ws.Range(2, 1, 4, 5).Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(235, 245, 255);
+            }
+
+            workbook.SaveAs(saveDialog.FileName);
+
+            MessageBox.Show($"✅ تم التصدير بنجاح!\n\nعدد الحزم: {packagesToExport.Count}\nالملف: {saveDialog.FileName}",
+                "نجح", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = saveDialog.FileName,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"خطأ في التصدير: {ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+    
+    private void ExportDetailsToExcel_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            if (_selectedPackage == null)
+            {
+                MessageBox.Show("لا توجد حزمة محددة!", "تنبيه",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            
+            if (_detailGrid.Rows.Count == 0)
+            {
+                MessageBox.Show("لا توجد تفاصيل للتصدير!", "تنبيه",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -778,98 +1515,161 @@ public partial class UmrahProfitabilityReport : Form
             using var saveDialog = new SaveFileDialog
             {
                 Filter = "Excel Files|*.xlsx",
-                Title = "حفظ تقرير ربحية العمرة",
-                FileName = $"ربحية_العمرة_{DateTime.Now:yyyy-MM-dd_HHmm}.xlsx"
+                Title = "حفظ تفاصيل حسابات الحزمة",
+                FileName = $"تفاصيل_{_selectedPackage.PackageNumber}_{DateTime.Now:yyyy-MM-dd_HHmm}.xlsx"
             };
             
             if (saveDialog.ShowDialog() != DialogResult.OK)
                 return;
             
             using var workbook = new ClosedXML.Excel.XLWorkbook();
-            var worksheet = workbook.Worksheets.Add("ربحية العمرة");
+            var worksheet = workbook.Worksheets.Add("تفاصيل الحسابات");
             
             // Title
-            worksheet.Cell(1, 1).Value = "تقرير ربحية حزم العمرة";
+            worksheet.Cell(1, 1).Value = "تفاصيل حسابات حزمة العمرة";
             worksheet.Cell(1, 1).Style.Font.Bold = true;
             worksheet.Cell(1, 1).Style.Font.FontSize = 18;
-            worksheet.Cell(1, 1).Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(52, 152, 219);
+            worksheet.Cell(1, 1).Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(41, 128, 185);
             worksheet.Cell(1, 1).Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
-            worksheet.Range(1, 1, 1, 9).Merge();
-            worksheet.Range(1, 1, 1, 9).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            worksheet.Range(1, 1, 1, 5).Merge();
+            worksheet.Range(1, 1, 1, 5).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
             
-            // Period
-            string period = _showAllCheckBox.Checked ? 
-                "جميع الفترات" : 
-                $"من {_startDatePicker.Value:yyyy-MM-dd} إلى {_endDatePicker.Value:yyyy-MM-dd}";
-            worksheet.Cell(2, 1).Value = $"الفترة: {period}";
-            worksheet.Range(2, 1, 2, 9).Merge();
-            worksheet.Range(2, 1, 2, 9).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            // Package Info
+            worksheet.Cell(2, 1).Value = $"رقم الحزمة: {_selectedPackage.PackageNumber}";
+            worksheet.Range(2, 1, 2, 2).Merge();
+            worksheet.Cell(2, 3).Value = $"اسم الرحلة: {_selectedPackage.TripName}";
+            worksheet.Range(2, 3, 2, 5).Merge();
+            
+            worksheet.Cell(3, 1).Value = $"عدد الأفراد: {_selectedPackage.NumberOfPersons}";
+            worksheet.Range(3, 1, 3, 2).Merge();
+            worksheet.Cell(3, 3).Value = $"التاريخ: {_selectedPackage.Date:yyyy-MM-dd}";
+            worksheet.Range(3, 3, 3, 5).Merge();
             
             // Headers
-            int headerRow = 4;
-            string[] headers = { "رقم الحزمة", "التاريخ", "اسم الرحلة", "عدد الأفراد", 
-                               "الإيرادات", "التكاليف", "صافي الربح", "هامش الربح %", "الحالة" };
+            int headerRow = 5;
+            string[] headers = { "البند", "تكلفة الفرد (ج.م)", "الإجمالي (ج.م)", "النسبة %", "ملاحظات" };
             
             for (int i = 0; i < headers.Length; i++)
             {
                 worksheet.Cell(headerRow, i + 1).Value = headers[i];
             }
             
-            var headerRange = worksheet.Range(headerRow, 1, headerRow, 9);
+            var headerRange = worksheet.Range(headerRow, 1, headerRow, 5);
             headerRange.Style.Font.Bold = true;
-            headerRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(44, 62, 80);
+            headerRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(52, 73, 94);
             headerRange.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
             headerRange.Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
             
             // Data
             int currentRow = headerRow + 1;
-            decimal totalRevenue = 0, totalCosts = 0, totalProfit = 0;
             
-            foreach (DataGridViewRow row in _profitGrid.Rows)
+            foreach (DataGridViewRow row in _detailGrid.Rows)
             {
-                worksheet.Cell(currentRow, 1).Value = row.Cells["PackageNumber"].Value?.ToString() ?? "";
-                worksheet.Cell(currentRow, 2).Value = row.Cells["Date"].Value?.ToString() ?? "";
-                worksheet.Cell(currentRow, 3).Value = row.Cells["TripName"].Value?.ToString() ?? "";
-                worksheet.Cell(currentRow, 4).Value = Convert.ToInt32(row.Cells["Persons"].Value ?? 0);
-                worksheet.Cell(currentRow, 5).Value = Convert.ToDecimal(row.Cells["Revenue"].Value ?? 0);
-                worksheet.Cell(currentRow, 6).Value = Convert.ToDecimal(row.Cells["Costs"].Value ?? 0);
-                worksheet.Cell(currentRow, 7).Value = Convert.ToDecimal(row.Cells["Profit"].Value ?? 0);
-                worksheet.Cell(currentRow, 8).Value = Convert.ToDecimal(row.Cells["Margin"].Value ?? 0);
-                worksheet.Cell(currentRow, 9).Value = row.Cells["Status"].Value?.ToString() ?? "";
+                // تخطي الصفوف الفارغة
+                if (row.Cells["DetailItem"].Value == null || 
+                    string.IsNullOrWhiteSpace(row.Cells["DetailItem"].Value.ToString()))
+                    continue;
                 
-                if (decimal.TryParse(row.Cells["Revenue"].Value?.ToString(), out decimal rev))
-                    totalRevenue += rev;
-                if (decimal.TryParse(row.Cells["Costs"].Value?.ToString(), out decimal cost))
-                    totalCosts += cost;
-                if (decimal.TryParse(row.Cells["Profit"].Value?.ToString(), out decimal prof))
-                    totalProfit += prof;
+                string itemName = row.Cells["DetailItem"].Value?.ToString() ?? "";
+                
+                // كتابة البيانات
+                worksheet.Cell(currentRow, 1).Value = itemName;
+                
+                // القيمة لكل فرد
+                var perPersonValue = row.Cells["DetailValuePerPerson"].Value;
+                if (perPersonValue != null && !string.IsNullOrEmpty(perPersonValue.ToString()))
+                {
+                    if (decimal.TryParse(perPersonValue.ToString(), out decimal perPerson))
+                        worksheet.Cell(currentRow, 2).Value = perPerson;
+                    else
+                        worksheet.Cell(currentRow, 2).Value = perPersonValue.ToString();
+                }
+                
+                // الإجمالي
+                var totalValue = row.Cells["DetailTotal"].Value;
+                if (totalValue != null && !string.IsNullOrEmpty(totalValue.ToString()))
+                {
+                    if (decimal.TryParse(totalValue.ToString(), out decimal total))
+                        worksheet.Cell(currentRow, 3).Value = total;
+                    else
+                        worksheet.Cell(currentRow, 3).Value = totalValue.ToString();
+                }
+                
+                // النسبة
+                var percentValue = row.Cells["DetailPercentage"].Value;
+                if (percentValue != null && !string.IsNullOrEmpty(percentValue.ToString()))
+                {
+                    if (decimal.TryParse(percentValue.ToString(), out decimal percent))
+                        worksheet.Cell(currentRow, 4).Value = percent;
+                    else
+                        worksheet.Cell(currentRow, 4).Value = percentValue.ToString();
+                }
+                
+                // الملاحظات
+                worksheet.Cell(currentRow, 5).Value = row.Cells["DetailNotes"].Value?.ToString() ?? "";
+                
+                // تنسيق الصفوف الخاصة (العناوين، الإجماليات)
+                if (itemName.Contains("💰 الإيرادات") || itemName.Contains("💸 التكاليف") || 
+                    itemName.Contains("📝 معلومات إضافية"))
+                {
+                    var headerRowRange = worksheet.Range(currentRow, 1, currentRow, 5);
+                    headerRowRange.Style.Font.Bold = true;
+                    headerRowRange.Style.Font.FontSize = 12;
+                    
+                    if (itemName.Contains("💰 الإيرادات"))
+                        headerRowRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(46, 204, 113);
+                    else if (itemName.Contains("💸 التكاليف"))
+                        headerRowRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(231, 76, 60);
+                    else
+                        headerRowRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.FromArgb(52, 73, 94);
+                    
+                    headerRowRange.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+                }
+                else if (itemName.Contains("📊 إجمالي") || itemName.Contains("💵 إجمالي") || 
+                         itemName.Contains("💎 صافي"))
+                {
+                    var totalRowRange = worksheet.Range(currentRow, 1, currentRow, 5);
+                    totalRowRange.Style.Font.Bold = true;
+                    totalRowRange.Style.Font.FontSize = 11;
+                    
+                    if (itemName.Contains("💎 صافي"))
+                    {
+                        var profit = _selectedPackage.NetProfit;
+                        totalRowRange.Style.Fill.BackgroundColor = profit >= 0 ? 
+                            ClosedXML.Excel.XLColor.FromArgb(46, 204, 113) : 
+                            ClosedXML.Excel.XLColor.FromArgb(231, 76, 60);
+                        totalRowRange.Style.Font.FontColor = ClosedXML.Excel.XLColor.White;
+                    }
+                    else
+                    {
+                        totalRowRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.LightGray;
+                    }
+                }
                 
                 currentRow++;
             }
             
-            // Totals
-            int totalRow = currentRow + 1;
-            worksheet.Cell(totalRow, 1).Value = "الإجماليات";
-            worksheet.Cell(totalRow, 1).Style.Font.Bold = true;
-            worksheet.Cell(totalRow, 5).Value = totalRevenue;
-            worksheet.Cell(totalRow, 6).Value = totalCosts;
-            worksheet.Cell(totalRow, 7).Value = totalProfit;
-            
-            var totalRange = worksheet.Range(totalRow, 1, totalRow, 9);
-            totalRange.Style.Font.Bold = true;
-            totalRange.Style.Fill.BackgroundColor = ClosedXML.Excel.XLColor.LightGray;
-            
             // Formatting
-            worksheet.Column(5).Style.NumberFormat.Format = "#,##0.00";
-            worksheet.Column(6).Style.NumberFormat.Format = "#,##0.00";
-            worksheet.Column(7).Style.NumberFormat.Format = "#,##0.00";
-            worksheet.Column(8).Style.NumberFormat.Format = "0.00";
+            worksheet.Column(1).Width = 35;
+            worksheet.Column(2).Width = 20;
+            worksheet.Column(3).Width = 20;
+            worksheet.Column(4).Width = 15;
+            worksheet.Column(5).Width = 40;
             
-            worksheet.Columns().AdjustToContents();
+            worksheet.Column(2).Style.NumberFormat.Format = "#,##0.00";
+            worksheet.Column(3).Style.NumberFormat.Format = "#,##0.00";
+            worksheet.Column(4).Style.NumberFormat.Format = "0.00";
+            
+            // تنسيق محاذاة
+            worksheet.Column(1).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Right;
+            worksheet.Column(2).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            worksheet.Column(3).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            worksheet.Column(4).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Center;
+            worksheet.Column(5).Style.Alignment.Horizontal = ClosedXML.Excel.XLAlignmentHorizontalValues.Right;
             
             workbook.SaveAs(saveDialog.FileName);
             
-            MessageBox.Show($"✅ تم التصدير بنجاح!\n\nالملف: {saveDialog.FileName}", 
+            MessageBox.Show($"✅ تم تصدير التفاصيل بنجاح!\n\nالملف: {saveDialog.FileName}", 
                 "نجح", MessageBoxButtons.OK, MessageBoxIcon.Information);
             
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -880,7 +1680,7 @@ public partial class UmrahProfitabilityReport : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في التصدير: {ex.Message}", "خطأ",
+            MessageBox.Show($"خطأ في تصدير التفاصيل: {ex.Message}", "خطأ",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }

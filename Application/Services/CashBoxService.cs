@@ -76,52 +76,57 @@ public class CashBoxService : ICashBoxService
     {
         using var _context = _contextFactory.CreateDbContext();
         
-        var currentUser = _authService.CurrentUser;
-        
-        // ✅ تحميل الـ entity من الداتابيز وتحديثها مباشرة لتجنب مشاكل Detached Entity
-        var existing = await _context.CashBoxes
-            .FirstOrDefaultAsync(c => c.Id == cashBox.Id && !c.IsDeleted);
+        await ConcurrencyExceptionHandler.ExecuteWithRetryAsync(async () =>
+        {
+            var currentUser = _authService.CurrentUser;
             
-        if (existing == null)
-            throw new InvalidOperationException("الخزنة غير موجودة");
-        
-        // تحديث الحقول المطلوبة فقط
-        existing.Name = cashBox.Name;
-        existing.Notes = cashBox.Notes;
-        existing.IsActive = cashBox.IsActive;
-        
-        if (currentUser != null)
-            existing.UpdatedBy = currentUser.UserId;
-        
-        existing.UpdatedAt = DateTime.UtcNow;
-        
-        await _context.SaveChangesAsync();
+            // ✅ تحميل الـ entity من الداتابيز وتحديثها مباشرة لتجنب مشاكل Detached Entity
+            var existing = await _context.CashBoxes
+                .FirstOrDefaultAsync(c => c.Id == cashBox.Id && !c.IsDeleted);
+                
+            if (existing == null)
+                throw new InvalidOperationException("الخزنة غير موجودة");
+            
+            // تحديث الحقول المطلوبة فقط
+            existing.Name = cashBox.Name;
+            existing.Notes = cashBox.Notes;
+            existing.IsActive = cashBox.IsActive;
+            
+            if (currentUser != null)
+                existing.UpdatedBy = currentUser.UserId;
+            
+            existing.UpdatedAt = DateTime.UtcNow;
+            
+            await _context.SaveChangesAsync();
+        });
     }
 
     public async Task DeleteCashBoxAsync(int id)
     {
         using var _context = _contextFactory.CreateDbContext();
         
-        System.Diagnostics.Debug.WriteLine($"=== DeleteCashBoxAsync ===");
-        System.Diagnostics.Debug.WriteLine($"محاولة حذف الخزنة رقم: {id}");
-        
-        var cashBox = await _context.CashBoxes
-            .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
-            
-        if (cashBox == null)
+        await ConcurrencyExceptionHandler.ExecuteWithRetryAsync(async () =>
         {
-            System.Diagnostics.Debug.WriteLine("❌ الخزنة غير موجودة!");
-            throw new InvalidOperationException("الخزنة غير موجودة");
-        }
-        
-        System.Diagnostics.Debug.WriteLine($"✅ تم العثور على الخزنة: {cashBox.Name}");
-        
-        // ═══════════════════════════════════════════════════════
-        // حذف جميع المعاملات المرتبطة بهذه الخزنة - HARD DELETE
-        // ═══════════════════════════════════════════════════════
-        var transactions = await _context.CashTransactions
-            .Where(t => t.CashBoxId == id)
-            .ToListAsync();
+            System.Diagnostics.Debug.WriteLine($"=== DeleteCashBoxAsync ===");
+            System.Diagnostics.Debug.WriteLine($"محاولة حذف الخزنة رقم: {id}");
+            
+            var cashBox = await _context.CashBoxes
+                .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
+                
+            if (cashBox == null)
+            {
+                System.Diagnostics.Debug.WriteLine("❌ الخزنة غير موجودة!");
+                throw new InvalidOperationException("الخزنة غير موجودة");
+            }
+            
+            System.Diagnostics.Debug.WriteLine($"✅ تم العثور على الخزنة: {cashBox.Name}");
+            
+            // ═══════════════════════════════════════════════════════
+            // حذف جميع المعاملات المرتبطة بهذه الخزنة - HARD DELETE
+            // ═══════════════════════════════════════════════════════
+            var transactions = await _context.CashTransactions
+                .Where(t => t.CashBoxId == id)
+                .ToListAsync();
             
         System.Diagnostics.Debug.WriteLine($"عدد المعاملات المرتبطة: {transactions.Count}");
         
@@ -139,6 +144,7 @@ public class CashBoxService : ICashBoxService
         
         var changesCount = await _context.SaveChangesAsync();
         System.Diagnostics.Debug.WriteLine($"✅ تم الحفظ بنجاح - إجمالي التغييرات: {changesCount}");
+        });
     }
 
     #endregion
@@ -161,82 +167,89 @@ public class CashBoxService : ICashBoxService
     {
         using var _context = _contextFactory.CreateDbContext();
 
-        var currentUser = _authService.CurrentUser;
-        if (currentUser != null)
+        // Use Serializable transaction for financial operations
+        return await TransactionScopeHelper.ExecuteInSerializableTransactionAsync(_context, async () =>
         {
-            transaction.CreatedBy = currentUser.UserId;
-        }
+            var currentUser = _authService.CurrentUser;
+            if (currentUser != null)
+            {
+                transaction.CreatedBy = currentUser.UserId;
+            }
 
-        // Get current balance
-        var cashBox = await _context.CashBoxes
-            .FirstOrDefaultAsync(c => c.Id == transaction.CashBoxId && !c.IsDeleted);
-        var currentBalance = cashBox?.CurrentBalance ?? 0m;
-        
-        transaction.Type = TransactionType.Income;
-        transaction.BalanceBefore = currentBalance;
-        transaction.BalanceAfter = currentBalance + transaction.Amount;
-        transaction.Month = transaction.TransactionDate.Month;
-        transaction.Year = transaction.TransactionDate.Year;
-        transaction.CreatedAt = DateTime.UtcNow;
-        
-        _context.CashTransactions.Add(transaction);
-        
-        if (cashBox != null)
-        {
-            cashBox.CurrentBalance += transaction.Amount;
-            _context.CashBoxes.Update(cashBox);
-        }
-        
-        await _context.SaveChangesAsync();
-        
-        if (_journalService != null)
-        {
-            try
+            // Get current balance
+            var cashBox = await _context.CashBoxes
+                .FirstOrDefaultAsync(c => c.Id == transaction.CashBoxId && !c.IsDeleted);
+            var currentBalance = cashBox?.CurrentBalance ?? 0m;
+            
+            transaction.Type = TransactionType.Income;
+            transaction.BalanceBefore = currentBalance;
+            transaction.BalanceAfter = currentBalance + transaction.Amount;
+            transaction.Month = transaction.TransactionDate.Month;
+            transaction.Year = transaction.TransactionDate.Year;
+            transaction.CreatedAt = DateTime.UtcNow;
+            
+            _context.CashTransactions.Add(transaction);
+            
+            if (cashBox != null)
             {
-                await _journalService.CreateCashTransactionJournalEntryAsync(transaction);
+                cashBox.CurrentBalance += transaction.Amount;
+                _context.CashBoxes.Update(cashBox);
             }
-            catch (Exception ex)
+            
+            await _context.SaveChangesAsync();
+            
+            if (_journalService != null)
             {
-                System.Diagnostics.Debug.WriteLine($"فشل إنشاء القيد اليومي: {ex.Message}");
+                try
+                {
+                    await _journalService.CreateCashTransactionJournalEntryAsync(transaction);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"فشل إنشاء القيد اليومي: {ex.Message}");
+                }
             }
-        }
-        
-        return transaction;
+            
+            return transaction;
+        });
     }
 
     public async Task<CashTransaction> AddExpenseAsync(CashTransaction transaction)
     {
         using var _context = _contextFactory.CreateDbContext();
 
-        var currentUser = _authService.CurrentUser;
-        if (currentUser != null)
+        // Use Serializable transaction for financial operations
+        return await TransactionScopeHelper.ExecuteInSerializableTransactionAsync(_context, async () =>
         {
-            transaction.CreatedBy = currentUser.UserId;
-        }
+            var currentUser = _authService.CurrentUser;
+            if (currentUser != null)
+            {
+                transaction.CreatedBy = currentUser.UserId;
+            }
 
-        var cashBox = await _context.CashBoxes
-            .FirstOrDefaultAsync(c => c.Id == transaction.CashBoxId && !c.IsDeleted);
-        
-        if (cashBox == null)
-        {
-            throw new InvalidOperationException("الخزنة غير موجودة");
-        }
-        
-        var currentBalance = cashBox.CurrentBalance;
-        
-        // ✅ في حالة InstaPay مع عمولة: المبلغ المخصوم الفعلي = Amount + Commission
-        decimal actualAmountToDeduct = transaction.Amount;
-        if (transaction.PaymentMethod == PaymentMethod.InstaPay && transaction.InstaPayCommission.HasValue)
-        {
-            actualAmountToDeduct = transaction.Amount + transaction.InstaPayCommission.Value;
-        }
-        
-        // منع الرصيد السالب - validation قوي
-        if (currentBalance < actualAmountToDeduct)
-        {
-            throw new InvalidOperationException(
-                $"الرصيد غير كافٍ لإتمام العملية. الرصيد الحالي: {currentBalance:N2}، المبلغ المطلوب: {actualAmountToDeduct:N2}");
-        }
+            var cashBox = await _context.CashBoxes
+                .FirstOrDefaultAsync(c => c.Id == transaction.CashBoxId && !c.IsDeleted);
+            
+            if (cashBox == null)
+            {
+                throw new InvalidOperationException("الخزنة غير موجودة");
+            }
+            
+            var currentBalance = cashBox.CurrentBalance;
+            
+            // ✅ في حالة InstaPay مع عمولة: المبلغ المخصوم الفعلي = Amount + Commission
+            decimal actualAmountToDeduct = transaction.Amount;
+            if (transaction.PaymentMethod == PaymentMethod.InstaPay && transaction.InstaPayCommission.HasValue)
+            {
+                actualAmountToDeduct = transaction.Amount + transaction.InstaPayCommission.Value;
+            }
+            
+            // منع الرصيد السالب - validation قوي
+            if (currentBalance < actualAmountToDeduct)
+            {
+                throw new InvalidOperationException(
+                    $"الرصيد غير كافٍ لإتمام العملية. الرصيد الحالي: {currentBalance:N2}، المبلغ المطلوب: {actualAmountToDeduct:N2}");
+            }
         
         var newBalance = currentBalance - actualAmountToDeduct;
         
@@ -274,6 +287,7 @@ public class CashBoxService : ICashBoxService
         }
         
         return transaction;
+        });
     }
 
     public async Task<CashTransaction?> GetTransactionByIdAsync(int transactionId)

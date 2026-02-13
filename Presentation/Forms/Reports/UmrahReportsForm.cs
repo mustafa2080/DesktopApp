@@ -202,6 +202,15 @@ public partial class UmrahReportsForm : Form
             Location = new Point(65, 25),
             PlaceholderText = "بحث برقم الحزمة، المعتمر، أو الوسيط..."
         };
+        
+        // Auto-select all text when clicking on search box
+        _searchBox.Enter += (s, e) => _searchBox.SelectAll();
+        _searchBox.MouseClick += (s, e) => 
+        {
+            if (!_searchBox.Focused)
+                _searchBox.SelectAll();
+        };
+        
         _searchBox.TextChanged += (s, e) => ApplyFilters();
         filterPanel.Controls.Add(_searchBox);
         

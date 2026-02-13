@@ -6,6 +6,7 @@ namespace GraceWay.AccountingSystem.Domain.Entities;
 /// <summary>
 /// دفعة معتمر
 /// </summary>
+[Table("umrahpayments")]
 public class UmrahPayment
 {
     [Key]

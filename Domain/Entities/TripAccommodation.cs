@@ -53,6 +53,7 @@ public class TripAccommodation
     /// <summary>
     /// نوع الغرفة
     /// </summary>
+    [Column("roomtype")]
     public RoomType RoomType { get; set; }
     
     /// <summary>

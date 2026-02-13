@@ -341,12 +341,16 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
             panel.Paint += PaintCard;
             panel.Paint += (s, e) =>
             {
-                using var brush = new LinearGradientBrush(
-                    new Rectangle(0, 0, panel.Width, 6),
-                    ColorScheme.Success,
-                    Color.FromArgb(34, 139, 34),
-                    LinearGradientMode.Horizontal);
-                e.Graphics.FillRectangle(brush, 0, 0, panel.Width, 6);
+                // شريط علوي أخضر - فحص الأبعاد أولاً
+                if (panel.Width > 0 && panel.Height > 0)
+                {
+                    using var brush = new LinearGradientBrush(
+                        new Rectangle(0, 0, panel.Width, 6),
+                        ColorScheme.Success,
+                        Color.FromArgb(34, 139, 34),
+                        LinearGradientMode.Horizontal);
+                    e.Graphics.FillRectangle(brush, 0, 0, panel.Width, 6);
+                }
             };
 
             // العنوان

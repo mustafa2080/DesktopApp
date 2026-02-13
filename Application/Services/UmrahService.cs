@@ -193,6 +193,11 @@ public class UmrahService : IUmrahService
 
             // ✅ السماح للجميع بالتعديل (بدون تحقق من اليوزر)
             Console.WriteLine($"✅ Found existing package. Current pilgrims count: {existing.Pilgrims.Count}");
+            Console.WriteLine($"📊 Package before update:");
+            Console.WriteLine($"   - TripName: {existing.TripName}");
+            Console.WriteLine($"   - NumberOfPersons: {existing.NumberOfPersons}");
+            Console.WriteLine($"   - MakkahHotel: {existing.MakkahHotel}");
+            Console.WriteLine($"   - SellingPrice: {existing.SellingPrice}");
             
             // تحديث البيانات
             existing.Date = package.Date;
@@ -218,39 +223,65 @@ public class UmrahService : IUmrahService
             existing.Status = package.Status;
             existing.IsActive = package.IsActive;
             existing.Notes = package.Notes;
-            existing.UpdatedBy = package.UpdatedBy;
+            existing.UpdatedBy = currentUser.UserId; // ✅ استخدام اليوزر الحالي بدلاً من package.UpdatedBy
             existing.UpdatedAt = DateTime.UtcNow;
             
-            Console.WriteLine($"✅ Package data updated");
+            Console.WriteLine($"✅ Package data updated - UpdatedBy set to: {currentUser.UserId}");
+            Console.WriteLine($"📊 Package after update:");
+            Console.WriteLine($"   - TripName: {existing.TripName}");
+            Console.WriteLine($"   - NumberOfPersons: {existing.NumberOfPersons}");
+            Console.WriteLine($"   - MakkahHotel: {existing.MakkahHotel}");
+            Console.WriteLine($"   - SellingPrice: {existing.SellingPrice}");
+            
+            // ✅ إجبار EF على تتبع التغييرات
+            _context.Entry(existing).State = EntityState.Modified;
+            Console.WriteLine($"✅ Entity state set to Modified");
             
             // Update pilgrims if provided
             if (package.Pilgrims != null && package.Pilgrims.Any())
             {
                 Console.WriteLine($"🔄 Updating pilgrims. New count: {package.Pilgrims.Count}");
                 
-                // Remove old pilgrims
+                // Remove old pilgrims completely
                 if (existing.Pilgrims.Any())
                 {
                     Console.WriteLine($"🗑️ Removing {existing.Pilgrims.Count} old pilgrims");
-                    _context.UmrahPilgrims.RemoveRange(existing.Pilgrims);
+                    var oldPilgrims = existing.Pilgrims.ToList(); // Create a copy to avoid collection modification
+                    foreach (var oldPilgrim in oldPilgrims)
+                    {
+                        _context.UmrahPilgrims.Remove(oldPilgrim);
+                    }
+                    existing.Pilgrims.Clear();
+                    
+                    // Save removal changes first
+                    await _context.SaveChangesAsync();
+                    Console.WriteLine($"✅ Old pilgrims removed and changes saved");
                 }
                 
-                // Clear the collection
-                existing.Pilgrims.Clear();
-                
-                // Add new pilgrims - let EF set the foreign key automatically
+                // Now add new pilgrims with fresh state
                 foreach (var pilgrim in package.Pilgrims)
                 {
-                    // Make sure the pilgrim doesn't have an ID (it's new)
-                    pilgrim.UmrahPilgrimId = 0;
-                    // Don't set UmrahPackageId - EF will set it via navigation property
-                    pilgrim.UmrahPackageId = existing.UmrahPackageId;
+                    // Create a completely new pilgrim entity
+                    var newPilgrim = new UmrahPilgrim
+                    {
+                        UmrahPackageId = existing.UmrahPackageId,
+                        PilgrimNumber = pilgrim.PilgrimNumber,
+                        FullName = pilgrim.FullName,
+                        RoomType = pilgrim.RoomType,
+                        SharedRoomNumber = pilgrim.SharedRoomNumber,
+                        TotalAmount = pilgrim.TotalAmount,
+                        PaidAmount = pilgrim.PaidAmount,
+                        CreatedBy = pilgrim.CreatedBy,
+                        RegisteredAt = pilgrim.RegisteredAt,
+                        UpdatedAt = DateTime.UtcNow,
+                        Status = pilgrim.Status
+                    };
                     
-                    existing.Pilgrims.Add(pilgrim);
-                    Console.WriteLine($"➕ Added pilgrim: {pilgrim.FullName}");
+                    existing.Pilgrims.Add(newPilgrim);
+                    Console.WriteLine($"➕ Added pilgrim: {newPilgrim.FullName}");
                 }
                 
-                Console.WriteLine($"✅ All {package.Pilgrims.Count} pilgrims added to existing package");
+                Console.WriteLine($"✅ All {package.Pilgrims.Count} new pilgrims prepared");
             }
             
             Console.WriteLine($"💾 Saving changes to database...");

@@ -132,13 +132,23 @@ public partial class LoginForm : Form
 
             if (result.Success)
             {
+                // ✅ Register session after successful login
+                var sessionId = SessionManager.Instance.RegisterSession(
+                    result.User!.UserId,
+                    result.User.Username,
+                    Environment.MachineName
+                );
+                
+                // Store session ID for logout
+                System.Diagnostics.Debug.WriteLine($"✅ Session registered: {sessionId} for user {result.User.Username}");
+                
                 // Successful login
                 //ShowSuccess("تم تسجيل الدخول بنجاح");
                // await Task.Delay(500); // Brief delay to show success message
                 
-                // Open main form
+                // Open main form with session ID
                 this.Hide();
-                var mainForm = new MainForm(username, result.User!.UserId, Program.ServiceProvider);
+                var mainForm = new MainForm(username, result.User!.UserId, Program.ServiceProvider, sessionId);
                 mainForm.FormClosed += (s, args) => this.Close();
                 mainForm.Show();
             }
