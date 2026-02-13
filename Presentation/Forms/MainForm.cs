@@ -17,6 +17,7 @@ public partial class MainForm : Form
     private HeaderControl? _header;
     private Panel? _contentPanel;
     private DashboardControl? _dashboard;
+    private System.Windows.Forms.Timer? _heartbeatTimer; // ✅ Heartbeat for session activity
 
     public MainForm(string userName, int userId, IServiceProvider serviceProvider, string sessionId)
     {
@@ -27,6 +28,12 @@ public partial class MainForm : Form
         InitializeComponent();
         InitializeCustomComponents();
         SetupMainLayout();
+        
+        // ✅ Start heartbeat timer to update session activity every 60 seconds
+        _heartbeatTimer = new System.Windows.Forms.Timer();
+        _heartbeatTimer.Interval = 60000; // 60 seconds
+        _heartbeatTimer.Tick += (s, e) => SessionManager.Instance.UpdateActivity(_sessionId);
+        _heartbeatTimer.Start();
     }
 
     private void InitializeCustomComponents()
@@ -924,6 +931,14 @@ public partial class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        // ✅ Stop heartbeat timer
+        try
+        {
+            _heartbeatTimer?.Stop();
+            _heartbeatTimer?.Dispose();
+        }
+        catch { }
+        
         // ✅ End session when form closes
         try
         {

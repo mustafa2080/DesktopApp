@@ -1,0 +1,13 @@
+import psycopg2
+conn = psycopg2.connect(host='localhost', port=5432, dbname='graceway_accounting', user='postgres', password='123456')
+cur = conn.cursor()
+cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name")
+tables = cur.fetchall()
+print('Tables:', [t[0] for t in tables])
+cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='Users' ORDER BY ordinal_position")
+cols = cur.fetchall()
+print('Users cols:', [c[0] for c in cols])
+cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name='users' ORDER BY ordinal_position")
+cols2 = cur.fetchall()
+print('users (lowercase) cols:', [c[0] for c in cols2])
+conn.close()

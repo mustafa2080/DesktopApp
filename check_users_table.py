@@ -1,0 +1,10 @@
+import sqlite3
+conn = sqlite3.connect(r'C:\Users\musta\Desktop\pro\accountant\accountant.db')
+cur = conn.cursor()
+cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+tables = cur.fetchall()
+print('Tables:', [t[0] for t in tables])
+cur.execute("PRAGMA table_info(Users)")
+cols = cur.fetchall()
+print('Users cols:', [(c[1], c[2]) for c in cols])
+conn.close()

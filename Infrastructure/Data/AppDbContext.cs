@@ -264,6 +264,9 @@ public class AppDbContext : DbContext
     // Audit Trail
     public DbSet<AuditLog> AuditLogs { get; set; }
 
+    // Active Sessions
+    public DbSet<ActiveSession> ActiveSessions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -1941,6 +1944,30 @@ public class AppDbContext : DbContext
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.EntityType);
             entity.HasIndex(e => e.Timestamp);
+        });
+
+        // ════════════════════════════════════════════════════════════════
+        // ACTIVE SESSION ENTITY CONFIGURATION
+        // ════════════════════════════════════════════════════════════════
+        modelBuilder.Entity<ActiveSession>(entity =>
+        {
+            entity.ToTable("active_sessions");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.SessionId).HasColumnName("session_id").HasMaxLength(100).IsRequired();
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Username).HasColumnName("username").HasMaxLength(100);
+            entity.Property(e => e.MachineName).HasColumnName("machine_name").HasMaxLength(200);
+            entity.Property(e => e.IpAddress).HasColumnName("ip_address").HasMaxLength(50);
+            entity.Property(e => e.LoginTime).HasColumnName("login_time").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.LastActivityTime).HasColumnName("last_activity_time").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.LogoutTime).HasColumnName("logout_time").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.IsActive).HasColumnName("is_active");
+
+            entity.HasIndex(e => e.SessionId).IsUnique();
+            entity.HasIndex(e => e.IsActive);
+            entity.HasIndex(e => e.UserId);
         });
 
         // ════════════════════════════════════════════════════════════════

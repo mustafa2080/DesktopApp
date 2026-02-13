@@ -22,13 +22,14 @@
             this.pnlRight = new System.Windows.Forms.Panel();
             this.pnlLoginCard = new System.Windows.Forms.Panel();
             this.btnLogin = new System.Windows.Forms.Button();
+            this.btnForgotPassword = new System.Windows.Forms.Button();
             this.txtPassword = new System.Windows.Forms.TextBox();
             this.txtUsername = new System.Windows.Forms.TextBox();
             this.lblPassword = new System.Windows.Forms.Label();
             this.lblUsername = new System.Windows.Forms.Label();
             this.lblSubtitle = new System.Windows.Forms.Label();
             this.lblTitle = new System.Windows.Forms.Label();
-            this.btnRegister = new System.Windows.Forms.Button();
+
             this.pnlLeft = new System.Windows.Forms.Panel();
             this.lblWelcome = new System.Windows.Forms.Label();
             this.lblCompanyName = new System.Windows.Forms.Label();
@@ -63,7 +64,8 @@
             // pnlLoginCard
             // 
             this.pnlLoginCard.Anchor = System.Windows.Forms.AnchorStyles.None;
-            this.pnlLoginCard.Controls.Add(this.btnRegister);
+
+            this.pnlLoginCard.Controls.Add(this.btnForgotPassword);
             this.pnlLoginCard.Controls.Add(this.btnLogin);
             this.pnlLoginCard.Controls.Add(this.txtPassword);
             this.pnlLoginCard.Controls.Add(this.txtUsername);
@@ -73,7 +75,7 @@
             this.pnlLoginCard.Controls.Add(this.lblTitle);
             this.pnlLoginCard.Location = new System.Drawing.Point(80, 100);
             this.pnlLoginCard.Name = "pnlLoginCard";
-            this.pnlLoginCard.Size = new System.Drawing.Size(440, 400);
+            this.pnlLoginCard.Size = new System.Drawing.Size(440, 390);
             this.pnlLoginCard.TabIndex = 0;
             // 
             // btnLogin
@@ -92,21 +94,22 @@
             this.btnLogin.UseVisualStyleBackColor = false;
             this.btnLogin.Click += new System.EventHandler(this.btnLogin_Click);
             // 
-            // btnRegister
+            // btnForgotPassword
             // 
-            this.btnRegister.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(220)))), ((int)(((byte)(220)))));
-            this.btnRegister.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.btnRegister.FlatAppearance.BorderSize = 0;
-            this.btnRegister.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnRegister.Font = new System.Drawing.Font("Cairo", 10F, System.Drawing.FontStyle.Bold);
-            this.btnRegister.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(118)))), ((int)(((byte)(210)))));
-            this.btnRegister.Location = new System.Drawing.Point(0, 350);
-            this.btnRegister.Name = "btnRegister";
-            this.btnRegister.Size = new System.Drawing.Size(440, 45);
-            this.btnRegister.TabIndex = 4;
-            this.btnRegister.Text = "إنشاء مستخدم جديد";
-            this.btnRegister.UseVisualStyleBackColor = false;
-            // btnRegister click handled separately if needed
+            this.btnForgotPassword.BackColor = System.Drawing.Color.Transparent;
+            this.btnForgotPassword.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnForgotPassword.FlatAppearance.BorderSize = 0;
+            this.btnForgotPassword.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnForgotPassword.Font = new System.Drawing.Font("Cairo", 9F, System.Drawing.FontStyle.Underline);
+            this.btnForgotPassword.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(25)))), ((int)(((byte)(118)))), ((int)(((byte)(210)))));
+            this.btnForgotPassword.Location = new System.Drawing.Point(0, 348);
+            this.btnForgotPassword.Name = "btnForgotPassword";
+            this.btnForgotPassword.Size = new System.Drawing.Size(440, 32);
+            this.btnForgotPassword.TabIndex = 4;
+            this.btnForgotPassword.Text = "🔑 نسيت كلمة المرور؟";
+            this.btnForgotPassword.UseVisualStyleBackColor = false;
+            this.btnForgotPassword.Click += new System.EventHandler(this.btnForgotPassword_Click);
+
             // 
             // txtPassword
             // 
@@ -259,6 +262,6 @@
         private System.Windows.Forms.TextBox txtUsername;
         private System.Windows.Forms.TextBox txtPassword;
         private System.Windows.Forms.Button btnLogin;
-        private System.Windows.Forms.Button btnRegister;
+        private System.Windows.Forms.Button btnForgotPassword;
     }
 }

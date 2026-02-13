@@ -16,6 +16,7 @@ public partial class ActiveSessionsForm : Form
     private Button _btnRefresh = null!;
     private Button _btnClose = null!;
     private Button _btnCleanup = null!;
+    private Button _btnForceEnd = null!;
 
     public ActiveSessionsForm()
     {
@@ -33,7 +34,7 @@ public partial class ActiveSessionsForm : Form
     private void InitializeCustomComponents()
     {
         this.Text = "الجلسات النشطة";
-        this.Size = new Size(1000, 600);
+        this.Size = new Size(1100, 600);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.RightToLeft = RightToLeft.Yes;
         this.RightToLeftLayout = true;
@@ -86,14 +87,21 @@ public partial class ActiveSessionsForm : Form
                 Name = "Username",
                 HeaderText = "اسم المستخدم",
                 DataPropertyName = "Username",
-                Width = 150
+                Width = 130
             },
             new DataGridViewTextBoxColumn
             {
                 Name = "MachineName",
                 HeaderText = "اسم الجهاز",
                 DataPropertyName = "MachineName",
-                Width = 150
+                Width = 130
+            },
+            new DataGridViewTextBoxColumn
+            {
+                Name = "IpAddress",
+                HeaderText = "عنوان IP",
+                DataPropertyName = "IpAddress",
+                Width = 130
             },
             new DataGridViewTextBoxColumn
             {
@@ -135,7 +143,7 @@ public partial class ActiveSessionsForm : Form
 
         _btnRefresh = new Button
         {
-            Text = "تحديث",
+            Text = "🔄 تحديث",
             Size = new Size(120, 40),
             Location = new Point(20, 10),
             BackColor = ColorScheme.Primary,
@@ -146,11 +154,24 @@ public partial class ActiveSessionsForm : Form
         };
         _btnRefresh.Click += BtnRefresh_Click;
 
+        _btnForceEnd = new Button
+        {
+            Text = "⛔ إنهاء الجلسة",
+            Size = new Size(160, 40),
+            Location = new Point(150, 10),
+            BackColor = Color.FromArgb(211, 47, 47),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            Cursor = Cursors.Hand
+        };
+        _btnForceEnd.Click += BtnForceEnd_Click;
+
         _btnCleanup = new Button
         {
-            Text = "تنظيف الجلسات القديمة",
-            Size = new Size(180, 40),
-            Location = new Point(150, 10),
+            Text = "🧹 تنظيف الجلسات القديمة",
+            Size = new Size(200, 40),
+            Location = new Point(320, 10),
             BackColor = ColorScheme.Warning,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -163,7 +184,7 @@ public partial class ActiveSessionsForm : Form
         {
             Text = "إغلاق",
             Size = new Size(120, 40),
-            Location = new Point(860, 10),
+            Location = new Point(960, 10),
             BackColor = ColorScheme.Danger,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
@@ -172,7 +193,7 @@ public partial class ActiveSessionsForm : Form
         };
         _btnClose.Click += (s, e) => this.Close();
 
-        bottomPanel.Controls.AddRange(new Control[] { _btnRefresh, _btnCleanup, _btnClose });
+        bottomPanel.Controls.AddRange(new Control[] { _btnRefresh, _btnForceEnd, _btnCleanup, _btnClose });
 
         this.Controls.Add(_gridSessions);
         this.Controls.Add(topPanel);
@@ -190,8 +211,9 @@ public partial class ActiveSessionsForm : Form
                 s.SessionId,
                 s.Username,
                 s.MachineName,
-                s.LoginTime,
-                s.LastActivityTime,
+                s.IpAddress,
+                LoginTime = s.LoginTime.ToLocalTime(),
+                LastActivityTime = s.LastActivityTime.ToLocalTime(),
                 IdleTime = FormatTimeSpan(s.IdleTime),
                 SessionDuration = FormatTimeSpan(s.SessionDuration)
             }).ToList();
@@ -228,6 +250,42 @@ public partial class ActiveSessionsForm : Form
     private void BtnRefresh_Click(object? sender, EventArgs e)
     {
         LoadSessions();
+    }
+
+    private void BtnForceEnd_Click(object? sender, EventArgs e)
+    {
+        if (_gridSessions.SelectedRows.Count == 0)
+        {
+            MessageBox.Show(
+                "يرجى اختيار جلسة لإنهائها",
+                "تنبيه",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            return;
+        }
+
+        var selectedRow = _gridSessions.SelectedRows[0];
+        var sessionId = selectedRow.Cells["SessionId"].Value?.ToString();
+        var username = selectedRow.Cells["Username"].Value?.ToString();
+
+        if (string.IsNullOrEmpty(sessionId)) return;
+
+        var result = MessageBox.Show(
+            $"هل تريد إنهاء جلسة المستخدم '{username}'؟",
+            "تأكيد إنهاء الجلسة",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (result == DialogResult.Yes)
+        {
+            SessionManager.Instance.ForceEndSession(sessionId);
+            LoadSessions();
+            MessageBox.Show(
+                $"تم إنهاء جلسة المستخدم '{username}' بنجاح",
+                "نجح",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
     }
 
     private void BtnCleanup_Click(object? sender, EventArgs e)

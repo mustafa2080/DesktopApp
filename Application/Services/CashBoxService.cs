@@ -104,46 +104,24 @@ public class CashBoxService : ICashBoxService
     public async Task DeleteCashBoxAsync(int id)
     {
         using var _context = _contextFactory.CreateDbContext();
-        
+
         await ConcurrencyExceptionHandler.ExecuteWithRetryAsync(async () =>
         {
-            System.Diagnostics.Debug.WriteLine($"=== DeleteCashBoxAsync ===");
-            System.Diagnostics.Debug.WriteLine($"محاولة حذف الخزنة رقم: {id}");
-            
+            // AsTracking() صريح لتجنب مشكلة NoTracking الموجودة في OnConfiguring
             var cashBox = await _context.CashBoxes
+                .AsTracking()
                 .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
-                
+
             if (cashBox == null)
-            {
-                System.Diagnostics.Debug.WriteLine("❌ الخزنة غير موجودة!");
                 throw new InvalidOperationException("الخزنة غير موجودة");
-            }
-            
-            System.Diagnostics.Debug.WriteLine($"✅ تم العثور على الخزنة: {cashBox.Name}");
-            
-            // ═══════════════════════════════════════════════════════
-            // حذف جميع المعاملات المرتبطة بهذه الخزنة - HARD DELETE
-            // ═══════════════════════════════════════════════════════
-            var transactions = await _context.CashTransactions
-                .Where(t => t.CashBoxId == id)
-                .ToListAsync();
-            
-        System.Diagnostics.Debug.WriteLine($"عدد المعاملات المرتبطة: {transactions.Count}");
-        
-        if (transactions.Any())
-        {
-            _context.CashTransactions.RemoveRange(transactions);
-            System.Diagnostics.Debug.WriteLine($"✅ تم حذف {transactions.Count} معاملة من قاعدة البيانات");
-        }
-        
-        // ═══════════════════════════════════════════════════════
-        // حذف الخزنة نفسها - HARD DELETE
-        // ═══════════════════════════════════════════════════════
-        _context.CashBoxes.Remove(cashBox);
-        System.Diagnostics.Debug.WriteLine("✅ تم حذف الخزنة من قاعدة البيانات");
-        
-        var changesCount = await _context.SaveChangesAsync();
-        System.Diagnostics.Debug.WriteLine($"✅ تم الحفظ بنجاح - إجمالي التغييرات: {changesCount}");
+
+            // حذف المعاملات المرتبطة أولاً بـ SQL مباشر لتجنب مشاكل Cascade
+            await _context.Database.ExecuteSqlRawAsync(
+                "DELETE FROM cashtransactions WHERE cashboxid = {0}", id);
+
+            // حذف الخزنة بـ EF مع tracking صحيح
+            _context.CashBoxes.Remove(cashBox);
+            await _context.SaveChangesAsync();
         });
     }
 

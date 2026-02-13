@@ -2,6 +2,7 @@
 using GraceWay.AccountingSystem.Infrastructure.Data;
 using GraceWay.AccountingSystem.Infrastructure.Configuration;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GraceWay.AccountingSystem.Presentation.Forms;
 
@@ -205,5 +206,25 @@ public partial class LoginForm : Form
             MessageBoxDefaultButton.Button1,
             MessageBoxOptions.RightAlign | MessageBoxOptions.RtlReading
         );
+    }
+
+    private void btnForgotPassword_Click(object? sender, EventArgs e)
+    {
+        try
+        {
+            var dbContext = Program.ServiceProvider.GetService(typeof(AppDbContext)) as AppDbContext;
+            if (dbContext == null)
+            {
+                ShowError("تعذر الاتصال بقاعدة البيانات");
+                return;
+            }
+
+            using var form = new ForgotPasswordForm(dbContext);
+            form.ShowDialog(this);
+        }
+        catch (Exception ex)
+        {
+            ShowError($"حدث خطأ: {ex.Message}");
+        }
     }
 }

@@ -261,6 +261,11 @@ static class Program
             authService.SetAuditService(auditService);
         }
         Console.WriteLine("  - All services configured successfully!");
+        
+        // ✅ Initialize SessionManager with ServiceProvider for database access
+        Console.WriteLine("  - Initializing SessionManager...");
+        SessionManager.Instance.Initialize(ServiceProvider);
+        Console.WriteLine("  - SessionManager initialized successfully!");
     }
     
     private static void EnsureDatabaseCreated()
