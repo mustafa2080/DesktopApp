@@ -54,15 +54,16 @@ public partial class AccountingCalculatorForm : Form
     
     private void SetupForm()
     {
-        this.Text = "الآلة الحاسبة المحاسبية";
-        this.Size = new Size(900, 700);
+        this.Text = "🧮 الآلة الحاسبة المحاسبية الاحترافية";
+        this.Size = new Size(950, 750);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.RightToLeft = RightToLeft.Yes;
         this.RightToLeftLayout = true;
-        this.BackColor = ColorScheme.Background;
+        this.BackColor = Color.FromArgb(240, 242, 245);
         this.Font = new Font("Cairo", 10F);
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
+        this.FormBorderStyle = FormBorderStyle.Sizable; // قابل للتحجيم
+        this.MinimumSize = new Size(950, 750);
+        this.MaximizeBox = true;
         this.KeyPreview = true;
     }
     
@@ -90,54 +91,65 @@ public partial class AccountingCalculatorForm : Form
         };
         
         // ══════════════════════════════════════
-        // Display Panel
+        // Display Panel مع تدرج لوني
         // ══════════════════════════════════════
         _displayPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 140,
-            BackColor = Color.FromArgb(245, 245, 245),
-            Padding = new Padding(15)
+            Height = 160,
+            BackColor = Color.FromArgb(66, 133, 244), // لون ثابت بدلاً من gradient
+            Padding = new Padding(20)
+        };
+        
+        // رسم gradient للخلفية
+        _displayPanel.Paint += (s, e) =>
+        {
+            using var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                _displayPanel.ClientRectangle,
+                Color.FromArgb(66, 133, 244),
+                Color.FromArgb(52, 168, 83),
+                45F);
+            e.Graphics.FillRectangle(brush, _displayPanel.ClientRectangle);
         };
         
         // Expression Box (shows calculation)
         _expressionBox = new TextBox
         {
             Dock = DockStyle.Top,
-            Height = 35,
-            Font = new Font("Consolas", 11F),
+            Height = 40,
+            Font = new Font("Consolas", 13F),
             BorderStyle = BorderStyle.None,
-            BackColor = Color.FromArgb(245, 245, 245),
-            ForeColor = ColorScheme.TextSecondary,
+            BackColor = Color.FromArgb(66, 133, 244), // نفس لون الخلفية بدلاً من شفاف
+            ForeColor = Color.FromArgb(230, 255, 255, 255),
             ReadOnly = true,
-            TextAlign = HorizontalAlignment.Left,
+            TextAlign = HorizontalAlignment.Right,
             Text = "0"
         };
         
-        // Main Display Box
+        // Main Display Box مع خط أكبر وأوضح
         _displayBox = new TextBox
         {
             Dock = DockStyle.Bottom,
-            Height = 65,
-            Font = new Font("Consolas", 28F, FontStyle.Bold),
+            Height = 75,
+            Font = new Font("Consolas", 36F, FontStyle.Bold),
             BorderStyle = BorderStyle.None,
-            BackColor = Color.FromArgb(245, 245, 245),
-            ForeColor = Color.FromArgb(33, 33, 33),
+            BackColor = Color.FromArgb(52, 168, 83), // لون ثابت بدلاً من شفاف
+            ForeColor = Color.White,
             ReadOnly = true,
-            TextAlign = HorizontalAlignment.Left,
+            TextAlign = HorizontalAlignment.Right,
             Text = "0",
             TabStop = true,
             TabIndex = 0
         };
         
-        // Memory Indicator
+        // Memory Indicator مع أيقونة
         _memoryIndicator = new Label
         {
             Text = "",
-            Font = new Font("Cairo", 9F, FontStyle.Bold),
-            ForeColor = ColorScheme.Primary,
+            Font = new Font("Cairo", 10F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(255, 235, 59),
             AutoSize = true,
-            Location = new Point(15, 10),
+            Location = new Point(20, 15),
             BackColor = Color.Transparent
         };
         
@@ -275,9 +287,9 @@ public partial class AccountingCalculatorForm : Form
     
     private void CreateCalculatorButtons()
     {
-        int buttonWidth = 70;
-        int buttonHeight = 55;
-        int spacing = 8;
+        int buttonWidth = 75;
+        int buttonHeight = 60;
+        int spacing = 10;
         int startX = 15;
         int startY = 15;
         
@@ -319,68 +331,97 @@ public partial class AccountingCalculatorForm : Form
             Text = text,
             Location = new Point(x, y),
             Size = new Size(width, height),
-            Font = new Font("Cairo", 11F, FontStyle.Bold),
+            Font = new Font("Cairo", 12F, FontStyle.Bold),
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand,
             TabStop = false
         };
         
-        // Color scheme based on button type
+        // ألوان عصرية مع ظلال
         if (char.IsDigit(text[0]) || text == ".")
         {
-            // Number buttons - White
+            // Number buttons - أبيض نظيف مع ظل خفيف
             btn.BackColor = Color.White;
             btn.ForeColor = Color.FromArgb(33, 33, 33);
-            btn.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 220);
+            btn.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
+            btn.FlatAppearance.BorderSize = 1;
         }
-        else if (text == "=" || text == "C" || text == "CE")
+        else if (text == "=")
         {
-            // Equals and Clear - Primary color
-            btn.BackColor = ColorScheme.Primary;
+            // زر المساواة - أخضر بارز
+            btn.BackColor = Color.FromArgb(52, 168, 83);
+            btn.ForeColor = Color.White;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Font = new Font("Cairo", 18F, FontStyle.Bold);
+        }
+        else if (text == "C" || text == "CE")
+        {
+            // Clear buttons - أحمر
+            btn.BackColor = Color.FromArgb(234, 67, 53);
             btn.ForeColor = Color.White;
             btn.FlatAppearance.BorderSize = 0;
         }
         else if (text == "+" || text == "-" || text == "×" || text == "÷")
         {
-            // Operations - Orange
-            btn.BackColor = Color.FromArgb(255, 152, 0);
+            // Operations - برتقالي مشرق
+            btn.BackColor = Color.FromArgb(251, 140, 0);
             btn.ForeColor = Color.White;
             btn.FlatAppearance.BorderSize = 0;
+            btn.Font = new Font("Cairo", 16F, FontStyle.Bold);
         }
         else if (text.StartsWith("M") || text == "MS")
         {
-            // Memory buttons - Purple
-            btn.BackColor = Color.FromArgb(156, 39, 176);
+            // Memory buttons - بنفسجي داكن
+            btn.BackColor = Color.FromArgb(103, 58, 183);
             btn.ForeColor = Color.White;
             btn.FlatAppearance.BorderSize = 0;
+            btn.Font = new Font("Cairo", 10F, FontStyle.Bold);
         }
         else if (text.StartsWith("TAX"))
         {
-            // Tax buttons - Green/Red
-            btn.BackColor = text.Contains("+") ? ColorScheme.Success : ColorScheme.Error;
+            // Tax buttons - تدرج أخضر/أحمر
+            btn.BackColor = text.Contains("+") ? Color.FromArgb(0, 150, 136) : Color.FromArgb(244, 67, 54);
             btn.ForeColor = Color.White;
             btn.FlatAppearance.BorderSize = 0;
-            btn.Font = new Font("Cairo", 8.5F, FontStyle.Bold);
+            btn.Font = new Font("Cairo", 9F, FontStyle.Bold);
+        }
+        else if (text == "⌫")
+        {
+            // Backspace - رمادي داكن
+            btn.BackColor = Color.FromArgb(96, 125, 139);
+            btn.ForeColor = Color.White;
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Font = new Font("Segoe UI", 16F);
         }
         else
         {
-            // Function buttons - Gray
-            btn.BackColor = Color.FromArgb(245, 245, 245);
+            // Function buttons - رمادي فاتح
+            btn.BackColor = Color.FromArgb(238, 238, 238);
             btn.ForeColor = Color.FromArgb(33, 33, 33);
-            btn.FlatAppearance.BorderColor = Color.FromArgb(220, 220, 220);
+            btn.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
+            btn.FlatAppearance.BorderSize = 1;
         }
         
-        btn.FlatAppearance.BorderSize = 1;
-        
-        // Hover effects
-        Color originalColor = btn.BackColor;
+        // تأثيرات hover للجميع
+        var originalColor = btn.BackColor;
         btn.MouseEnter += (s, e) =>
         {
-            btn.BackColor = ColorScheme.Darken(originalColor, 0.1f);
+            // تفتيح اللون عند hover
+            btn.BackColor = ControlPaint.Light(originalColor, 0.1f);
         };
         btn.MouseLeave += (s, e) =>
         {
             btn.BackColor = originalColor;
+        };
+        
+        // تأثير الضغط
+        btn.MouseDown += (s, e) =>
+        {
+            btn.BackColor = ControlPaint.Dark(originalColor, 0.1f);
+        };
+        btn.MouseUp += (s, e) =>
+        {
+            btn.BackColor = ControlPaint.Light(originalColor, 0.1f);
         };
         
         // Click handler

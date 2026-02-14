@@ -11,6 +11,8 @@ public interface IAuditService
     Task<List<AuditLog>> GetLogsAsync(DateTime? fromDate = null, DateTime? toDate = null, int? userId = null, string? entityType = null);
     Task<List<AuditLog>> GetEntityLogsAsync(string entityType, int entityId);
     Task<List<AuditLog>> GetUserLogsAsync(int userId, DateTime? fromDate = null, DateTime? toDate = null);
+    Task<bool> DeleteLogAsync(int auditLogId);
+    Task<bool> DeleteAllLogsAsync();
 }
 
 public class AuditService : IAuditService
@@ -127,5 +129,50 @@ public class AuditService : IAuditService
             query = query.Where(a => a.Timestamp <= toDate.Value);
 
         return await query.OrderByDescending(a => a.Timestamp).ToListAsync();
+    }
+
+    public async Task<bool> DeleteLogAsync(int auditLogId)
+    {
+        try
+        {
+            using var context = _contextFactory.CreateDbContext();
+            
+            var log = await context.AuditLogs.FindAsync(auditLogId);
+            if (log == null)
+                return false;
+
+            context.AuditLogs.Remove(log);
+            await context.SaveChangesAsync();
+
+            Console.WriteLine($"✓ Deleted AuditLog ID: {auditLogId}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ DeleteLog Error: {ex.Message}");
+            return false;
+        }
+    }
+
+    public async Task<bool> DeleteAllLogsAsync()
+    {
+        try
+        {
+            using var context = _contextFactory.CreateDbContext();
+            
+            var allLogs = await context.AuditLogs.ToListAsync();
+            int count = allLogs.Count;
+
+            context.AuditLogs.RemoveRange(allLogs);
+            await context.SaveChangesAsync();
+
+            Console.WriteLine($"✓ Deleted ALL AuditLogs: {count} records removed");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ DeleteAllLogs Error: {ex.Message}");
+            return false;
+        }
     }
 }

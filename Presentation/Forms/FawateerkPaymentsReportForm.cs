@@ -486,7 +486,7 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
 
                 foreach (var payment in payments)
                 {
-                    // Extract customer info from notes
+                    // Extract customer info and trip from notes
                     string customerName = "";
                     string customerPhone = "";
                     string tripName = "";
@@ -494,19 +494,30 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
 
                     if (notes.Contains("العميل:"))
                     {
-                        var parts = notes.Split(new[] { "العميل:", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                        if (parts.Length > 1)
+                        var lines = notes.Split('\n');
+                        foreach (var line in lines)
                         {
-                            var customerInfo = parts[1].Trim().Split('-');
-                            customerName = customerInfo[0].Trim();
-                            if (customerInfo.Length > 1)
+                            if (line.Contains("العميل:"))
                             {
-                                customerPhone = customerInfo[1].Trim();
+                                var customerPart = line.Replace("دفعة من فواتيرك - العميل:", "").Trim();
+                                var customerInfo = customerPart.Split('-');
+                                customerName = customerInfo[0].Trim();
+                                if (customerInfo.Length > 1)
+                                {
+                                    customerPhone = customerInfo[1].Trim();
+                                }
                             }
-                        }
-                        if (parts.Length > 2)
-                        {
-                            notes = parts[2].Trim();
+                            else if (line.Contains("الرحلة:"))
+                            {
+                                tripName = line.Replace("الرحلة:", "").Trim();
+                            }
+                            else if (!string.IsNullOrWhiteSpace(line) && !line.Contains("فواتيرك"))
+                            {
+                                if (string.IsNullOrEmpty(notes) || notes == payment.Notes)
+                                {
+                                    notes = line.Trim();
+                                }
+                            }
                         }
                     }
 
@@ -678,23 +689,27 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                     // Reference Number
                     AddDetailRow(infoPanel, "🔢 رقم المرجع:", payment.ReferenceNumber ?? "غير محدد", ref yPos);
 
-                    // Extract customer info from notes
+                    // Extract customer info and trip from notes
                     string customerInfo = "غير محدد";
                     string tripInfo = "غير محدد";
                     string cleanNotes = payment.Notes ?? "";
 
                     if (!string.IsNullOrEmpty(payment.Notes))
                     {
-                        if (payment.Notes.Contains("العميل:"))
+                        var lines = payment.Notes.Split('\n');
+                        foreach (var line in lines)
                         {
-                            var parts = payment.Notes.Split(new[] { "العميل:", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                            if (parts.Length > 1)
+                            if (line.Contains("العميل:"))
                             {
-                                customerInfo = parts[1].Trim();
+                                customerInfo = line.Replace("دفعة من فواتيرك - العميل:", "").Trim();
                             }
-                            if (parts.Length > 2)
+                            else if (line.Contains("الرحلة:"))
                             {
-                                cleanNotes = parts[2].Trim();
+                                tripInfo = line.Replace("الرحلة:", "").Trim();
+                            }
+                            else if (!string.IsNullOrWhiteSpace(line) && !line.Contains("فواتيرك"))
+                            {
+                                cleanNotes = line.Trim();
                             }
                         }
                     }
@@ -798,9 +813,15 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
         {
             try
             {
-                // Load payment with tracking enabled
+                // Detach ALL tracked entities to avoid any conflicts
+                foreach (var entry in _context.ChangeTracker.Entries().ToList())
+                {
+                    entry.State = EntityState.Detached;
+                }
+
+                // Load payment fresh from database
                 var payment = _context.Set<BankTransfer>()
-                    .AsTracking()
+                    .AsNoTracking()
                     .Include(t => t.DestinationBankAccount)
                     .FirstOrDefault(t => t.Id == paymentId);
 
@@ -811,10 +832,15 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                     return;
                 }
 
+                // Store original values for later
+                decimal originalAmount = payment.Amount;
+                int? originalBankId = payment.DestinationBankAccountId;
+                decimal originalBankBalance = payment.DestinationBankAccount?.Balance ?? 0;
+
                 using (var editForm = new Form())
                 {
                     editForm.Text = "تعديل دفعة فواتيرك";
-                    editForm.Size = new Size(600, 500);
+                    editForm.Size = new Size(600, 620);
                     editForm.RightToLeft = RightToLeft.Yes;
                     editForm.RightToLeftLayout = false;
                     editForm.StartPosition = FormStartPosition.CenterParent;
@@ -822,6 +848,21 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                     editForm.MaximizeBox = false;
                     editForm.MinimizeBox = false;
                     editForm.Font = new Font("Cairo", 10F);
+
+                    // Extract current trip name from notes
+                    string currentTripName = "";
+                    if (!string.IsNullOrEmpty(payment.Notes))
+                    {
+                        var lines = payment.Notes.Split('\n');
+                        foreach (var line in lines)
+                        {
+                            if (line.Contains("الرحلة:"))
+                            {
+                                currentTripName = line.Replace("الرحلة:", "").Trim();
+                                break;
+                            }
+                        }
+                    }
 
                     // Amount
                     Label lblAmount = new Label
@@ -836,11 +877,13 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                     {
                         Location = new Point(150, 30),
                         Size = new Size(280, 30),
-                        Maximum = 1000000000,
+                        Maximum = 1000000000m,
                         DecimalPlaces = 2,
-                        Value = payment.Amount,
                         Font = new Font("Cairo", 10F)
                     };
+                    // Set Value BEFORE Minimum to avoid ArgumentOutOfRangeException
+                    numAmount.Value = payment.Amount <= 0 ? 100m : payment.Amount;
+                    numAmount.Minimum = 0.01m;
                     editForm.Controls.Add(numAmount);
 
                     // Reference Number
@@ -882,22 +925,121 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                     };
                     editForm.Controls.Add(dtpDate);
 
+                    // Trip ComboBox
+                    Label lblTrip = new Label
+                    {
+                        Text = "الرحلة:",
+                        Location = new Point(450, 180),
+                        Size = new Size(100, 25)
+                    };
+                    editForm.Controls.Add(lblTrip);
+
+                    ComboBox cmbTrip = new ComboBox
+                    {
+                        Location = new Point(150, 180),
+                        Size = new Size(280, 30),
+                        Font = new Font("Cairo", 10F),
+                        DropDownStyle = ComboBoxStyle.DropDownList
+                    };
+
+                    // Load trips
+                    var trips = _context.Set<Trip>()
+                        .AsNoTracking()
+                        .Where(t => t.IsActive)
+                        .OrderByDescending(t => t.StartDate)
+                        .Select(t => new
+                        {
+                            Id = t.TripId,
+                            Name = t.TripName,
+                            DisplayName = $"{t.TripName} - {t.StartDate:dd/MM/yyyy}"
+                        })
+                        .ToList();
+
+                    trips.Insert(0, new { Id = 0, Name = "", DisplayName = "-- بدون رحلة --" });
+                    cmbTrip.DataSource = trips;
+                    cmbTrip.DisplayMember = "DisplayName";
+                    cmbTrip.ValueMember = "Id";
+
+                    // Try to select current trip - match by DisplayName or Name
+                    if (!string.IsNullOrEmpty(currentTripName))
+                    {
+                        // First try exact match on DisplayName (notes store: "TripName - dd/MM/yyyy")
+                        var selectedTrip = trips.FirstOrDefault(t =>
+                            !string.IsNullOrEmpty(t.DisplayName) &&
+                            t.DisplayName.Trim().Equals(currentTripName.Trim(), StringComparison.OrdinalIgnoreCase));
+
+                        // If no exact match, try matching just the trip name part
+                        if (selectedTrip == null)
+                        {
+                            string tripNameOnly = currentTripName;
+                            if (currentTripName.Contains(" - "))
+                            {
+                                tripNameOnly = currentTripName.Split(new[] { " - " }, StringSplitOptions.None)[0].Trim();
+                            }
+                            selectedTrip = trips.FirstOrDefault(t =>
+                                !string.IsNullOrEmpty(t.Name) &&
+                                t.Name.Trim().Equals(tripNameOnly, StringComparison.OrdinalIgnoreCase));
+                        }
+
+                        // If still no match, try contains
+                        if (selectedTrip == null)
+                        {
+                            string tripNameOnly = currentTripName.Contains(" - ")
+                                ? currentTripName.Split(new[] { " - " }, StringSplitOptions.None)[0].Trim()
+                                : currentTripName;
+                            selectedTrip = trips.FirstOrDefault(t =>
+                                !string.IsNullOrEmpty(t.Name) &&
+                                t.Name.Contains(tripNameOnly));
+                        }
+
+                        if (selectedTrip != null)
+                        {
+                            cmbTrip.SelectedValue = selectedTrip.Id;
+                        }
+                        else
+                        {
+                            cmbTrip.SelectedIndex = 0;
+                        }
+                    }
+                    else
+                    {
+                        cmbTrip.SelectedIndex = 0;
+                    }
+
+                    editForm.Controls.Add(cmbTrip);
+
                     // Notes
                     Label lblNotes = new Label
                     {
                         Text = "الملاحظات:",
-                        Location = new Point(450, 180),
+                        Location = new Point(450, 230),
                         Size = new Size(100, 25)
                     };
                     editForm.Controls.Add(lblNotes);
 
+                    // Extract clean notes (without customer and trip info)
+                    string cleanNotes = "";
+                    if (!string.IsNullOrEmpty(payment.Notes))
+                    {
+                        var lines = payment.Notes.Split('\n');
+                        var noteLines = new List<string>();
+                        foreach (var line in lines)
+                        {
+                            if (!line.Contains("فواتيرك") && !line.Contains("العميل:") && !line.Contains("الرحلة:") && !string.IsNullOrWhiteSpace(line))
+                            {
+                                noteLines.Add(line.Trim());
+                            }
+                        }
+                        cleanNotes = string.Join("\n", noteLines);
+                    }
+
                     TextBox txtNotes = new TextBox
                     {
-                        Location = new Point(150, 180),
+                        Location = new Point(150, 230),
                         Size = new Size(280, 120),
                         Multiline = true,
                         ScrollBars = ScrollBars.Vertical,
-                        Text = payment.Notes ?? "",
+                        Text = cleanNotes,
                         Font = new Font("Cairo", 10F)
                     };
                     editForm.Controls.Add(txtNotes);
@@ -906,7 +1048,7 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                     Button btnSave = new Button
                     {
                         Text = "💾 حفظ",
-                        Location = new Point(300, 320),
+                        Location = new Point(300, 370),
                         Size = new Size(130, 40),
                         BackColor = ColorScheme.Success,
                         ForeColor = Color.White,
@@ -927,38 +1069,151 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                                 return;
                             }
 
-                            // Store old amount for potential bank balance update
-                            decimal oldAmount = payment.Amount;
-                            decimal newAmount = numAmount.Value;
-
-                            // Update payment properties
-                            payment.Amount = newAmount;
-                            payment.ReferenceNumber = txtRef.Text.Trim();
-                            payment.TransferDate = DateTime.SpecifyKind(dtpDate.Value, DateTimeKind.Utc);
-                            payment.Notes = txtNotes.Text.Trim();
-
-                            // If amount changed, update bank balance using the already tracked entity
-                            if (oldAmount != newAmount && payment.DestinationBankAccount != null)
+                            // Extract customer info from original notes
+                            string customerInfo = "";
+                            string existingNotes = "";
+                            if (!string.IsNullOrEmpty(payment.Notes))
                             {
-                                // Reverse old amount and add new amount
-                                payment.DestinationBankAccount.Balance = payment.DestinationBankAccount.Balance - oldAmount + newAmount;
+                                var lines = payment.Notes.Split('\n');
+                                foreach (var line in lines)
+                                {
+                                    if (line.Contains("دفعة من فواتيرك") || line.Contains("العميل:"))
+                                    {
+                                        if (line.Contains("العميل:"))
+                                        {
+                                            customerInfo = line;
+                                        }
+                                    }
+                                    else if (!line.Contains("الرحلة:") && !string.IsNullOrWhiteSpace(line))
+                                    {
+                                        existingNotes += (string.IsNullOrEmpty(existingNotes) ? "" : "\n") + line;
+                                    }
+                                }
+                            }
+                            
+                            // If no customer info found, this is NOT a Fawateerk payment - abort!
+                            if (string.IsNullOrEmpty(customerInfo))
+                            {
+                                MessageBox.Show("خطأ: هذه الدفعة ليست دفعة فواتيرك!", "خطأ",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                return;
                             }
 
-                            // Save changes
-                            int result = _context.SaveChanges();
-
-                            if (result > 0)
+                            // Build trip info
+                            string tripInfo = "";
+                            Console.WriteLine($"DEBUG SAVE: cmbTrip.SelectedValue = {cmbTrip.SelectedValue}");
+                            Console.WriteLine($"DEBUG SAVE: cmbTrip.SelectedIndex = {cmbTrip.SelectedIndex}");
+                            Console.WriteLine($"DEBUG SAVE: cmbTrip.Text = {cmbTrip.Text}");
+                            
+                            if (cmbTrip.SelectedValue != null && Convert.ToInt32(cmbTrip.SelectedValue) > 0)
                             {
-                                MessageBox.Show("تم تحديث الدفعة بنجاح", "نجح",
-                                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                                editForm.DialogResult = DialogResult.OK;
-                                editForm.Close();
+                                int tripId = Convert.ToInt32(cmbTrip.SelectedValue);
+                                Console.WriteLine($"DEBUG SAVE: Selected trip ID: {tripId}");
+                                
+                                var trip = _context.Set<Trip>().AsNoTracking().FirstOrDefault(t => t.TripId == tripId);
+                                if (trip != null)
+                                {
+                                    tripInfo = $"\nالرحلة: {trip.TripName} - {trip.StartDate:dd/MM/yyyy}";
+                                    Console.WriteLine($"DEBUG SAVE: Trip info built: {tripInfo}");
+                                }
+                                else
+                                {
+                                    Console.WriteLine($"DEBUG SAVE: Trip not found in database with ID: {tripId}");
+                                }
                             }
                             else
                             {
-                                MessageBox.Show("لم يتم حفظ أي تغييرات", "تنبيه",
-                                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                Console.WriteLine($"DEBUG SAVE: No trip selected or trip ID is 0");
                             }
+
+                            decimal newAmount = numAmount.Value;
+
+                            // Rebuild notes with customer, trip, and user notes
+                            string newNotes = "دفعة من فواتيرك - " + customerInfo;
+                            if (!string.IsNullOrEmpty(tripInfo))
+                            {
+                                newNotes += tripInfo;
+                            }
+                            if (!string.IsNullOrWhiteSpace(txtNotes.Text))
+                            {
+                                newNotes += "\n" + txtNotes.Text.Trim();
+                            }
+                            else if (!string.IsNullOrEmpty(existingNotes))
+                            {
+                                // Preserve existing notes if user didn't edit them
+                                newNotes += "\n" + existingNotes;
+                            }
+
+                            var newDate = DateTime.SpecifyKind(dtpDate.Value, DateTimeKind.Utc);
+                            var newRef = txtRef.Text.Trim();
+
+                            // Diagnostic logging
+                            Console.WriteLine($"=== FAWATEERK SAVE DEBUG ===");
+                            Console.WriteLine($"Payment ID: {paymentId}");
+                            Console.WriteLine($"New Amount: {newAmount}");
+                            Console.WriteLine($"New Ref: {newRef}");
+                            Console.WriteLine($"New Date: {newDate}");
+                            Console.WriteLine($"New Notes: {newNotes}");
+                            Console.WriteLine($"Original Amount: {originalAmount}");
+                            Console.WriteLine($"Trip Info: {tripInfo}");
+                            Console.WriteLine($"=== END DEBUG ===");
+
+                            // Use execution strategy with proper transaction handling
+                            var strategy = _context.Database.CreateExecutionStrategy();
+                            strategy.Execute(() =>
+                            {
+                                using (var transaction = _context.Database.BeginTransaction())
+                                {
+                                    try
+                                    {
+                                        // Detach any existing tracked entities
+                                        _context.ChangeTracker.Clear();
+
+                                        // Fetch and attach the entity
+                                        var paymentToUpdate = _context.Set<BankTransfer>().Find(paymentId);
+                                        if (paymentToUpdate == null)
+                                        {
+                                            throw new Exception("لم يتم العثور على الدفعة");
+                                        }
+
+                                        // Update payment fields
+                                        paymentToUpdate.Amount = newAmount;
+                                        paymentToUpdate.ReferenceNumber = newRef;
+                                        paymentToUpdate.TransferDate = newDate;
+                                        paymentToUpdate.Notes = newNotes;
+
+                                        // If amount changed, update bank balance
+                                        if (originalAmount != newAmount && originalBankId.HasValue)
+                                        {
+                                            var bankAccount = _context.Set<BankAccount>().Find(originalBankId.Value);
+                                            if (bankAccount != null)
+                                            {
+                                                decimal balanceDiff = newAmount - originalAmount;
+                                                bankAccount.Balance += balanceDiff;
+                                                Console.WriteLine($"Bank balance updated: {originalBankBalance} + {balanceDiff} = {bankAccount.Balance}");
+                                            }
+                                        }
+
+                                        // Save changes
+                                        int changesSaved = _context.SaveChanges();
+                                        Console.WriteLine($"Changes saved: {changesSaved} entities");
+
+                                        transaction.Commit();
+                                        Console.WriteLine("Transaction committed successfully");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Console.WriteLine($"ERROR in transaction: {ex.Message}");
+                                        transaction.Rollback();
+                                        throw;
+                                    }
+                                }
+                            });
+
+                            MessageBox.Show("تم تحديث الدفعة بنجاح", "نجح",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            editForm.DialogResult = DialogResult.OK;
+                            editForm.Close();
                         }
                         catch (Exception ex)
                         {
@@ -972,7 +1227,7 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                     Button btnCancel = new Button
                     {
                         Text = "❌ إلغاء",
-                        Location = new Point(150, 320),
+                        Location = new Point(150, 370),
                         Size = new Size(130, 40),
                         BackColor = Color.FromArgb(108, 117, 125),
                         ForeColor = Color.White,
@@ -1001,14 +1256,19 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
         {
             try
             {
-                // استخدام AsNoTracking لتجنب تتبع الكيان مرتين
-                var paymentInfo = _context.Set<BankTransfer>()
-                    .AsNoTracking()
-                    .Where(t => t.Id == paymentId)
-                    .Select(t => new { t.Amount, t.ReferenceNumber })
-                    .FirstOrDefault();
+                // Detach ALL tracked entities to avoid conflicts
+                foreach (var entry in _context.ChangeTracker.Entries().ToList())
+                {
+                    entry.State = EntityState.Detached;
+                }
 
-                if (paymentInfo == null)
+                // Load payment info (no tracking needed, we'll use raw SQL)
+                var payment = _context.Set<BankTransfer>()
+                    .AsNoTracking()
+                    .Include(t => t.DestinationBankAccount)
+                    .FirstOrDefault(t => t.Id == paymentId);
+
+                if (payment == null)
                 {
                     MessageBox.Show("لم يتم العثور على الدفعة", "خطأ",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -1016,18 +1276,58 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                 }
 
                 var result = MessageBox.Show(
-                    $"هل أنت متأكد من حذف هذه الدفعة؟\n\nالمبلغ: {paymentInfo.Amount:N2} ج.م\nرقم المرجع: {paymentInfo.ReferenceNumber ?? "غير محدد"}",
+                    $"هل أنت متأكد من حذف هذه الدفعة؟\n\nالمبلغ: {payment.Amount:N2} ج.م\nرقم المرجع: {payment.ReferenceNumber ?? "غير محدد"}",
                     "تأكيد الحذف",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning);
 
                 if (result == DialogResult.Yes)
                 {
-                    // إنشاء كيان جديد للحذف بدون تتبع سابق
-                    var payment = new BankTransfer { Id = paymentId };
-                    _context.Set<BankTransfer>().Attach(payment);
-                    _context.Set<BankTransfer>().Remove(payment);
-                    _context.SaveChanges();
+                    var strategy = _context.Database.CreateExecutionStrategy();
+                    strategy.Execute(() =>
+                    {
+                        using (var transaction = _context.Database.BeginTransaction())
+                        {
+                            try
+                            {
+                                // Clear tracking to avoid conflicts
+                                _context.ChangeTracker.Clear();
+
+                                // Get and attach the payment entity
+                                var paymentToDelete = _context.Set<BankTransfer>().Find(paymentId);
+                                if (paymentToDelete == null)
+                                {
+                                    throw new Exception("لم يتم العثور على الدفعة");
+                                }
+
+                                // Restore bank balance before deleting
+                                if (paymentToDelete.DestinationBankAccountId.HasValue && paymentToDelete.Amount > 0)
+                                {
+                                    var bankAccount = _context.Set<BankAccount>().Find(paymentToDelete.DestinationBankAccountId.Value);
+                                    if (bankAccount != null)
+                                    {
+                                        bankAccount.Balance -= paymentToDelete.Amount;
+                                        Console.WriteLine($"Bank balance updated: {bankAccount.Balance + paymentToDelete.Amount} - {paymentToDelete.Amount} = {bankAccount.Balance}");
+                                    }
+                                }
+
+                                // Delete the payment
+                                _context.Set<BankTransfer>().Remove(paymentToDelete);
+                                
+                                // Save changes
+                                int changes = _context.SaveChanges();
+                                Console.WriteLine($"Delete changes saved: {changes} entities");
+
+                                transaction.Commit();
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"ERROR in delete transaction: {ex.Message}");
+                                transaction.Rollback();
+                                throw;
+                            }
+                        }
+                    });
 
                     MessageBox.Show("تم حذف الدفعة بنجاح", "نجح",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);

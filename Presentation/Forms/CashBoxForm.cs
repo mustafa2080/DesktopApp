@@ -1798,25 +1798,64 @@ public partial class CashBoxForm : Form
         }
     }
     
-    private void ScreenshotButton_Click(object? sender, EventArgs e)
+    private async void ScreenshotButton_Click(object? sender, EventArgs e)
     {
         try
         {
-            using Bitmap bmp = new Bitmap(this.Width, this.Height);
-            this.DrawToBitmap(bmp, new Rectangle(0, 0, this.Width, this.Height));
+            // التحقق من وجود بيانات
+            if (_transactionsGrid.Rows.Count == 0)
+            {
+                ShowError("لا توجد معاملات لعرضها");
+                return;
+            }
             
-            string fileName = $"CashBox_Screenshot_{DateTime.Now:yyyyMMdd_HHmmss}.png";
-            string filePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), fileName);
+            // تحديد نطاق التاريخ بناءً على الفلتر
+            string dateRangeText = "";
             
-            bmp.Save(filePath, System.Drawing.Imaging.ImageFormat.Png);
+            if (_filterByDayCheckbox.Checked)
+            {
+                dateRangeText = _dayFilter.Value.ToString("yyyy-MM-dd");
+            }
+            else
+            {
+                dateRangeText = $"{GetMonthName(_selectedMonth)}_{_selectedYear}";
+            }
             
-            MessageBox.Show($"✅ تم حفظ لقطة الشاشة بنجاح\n\n{filePath}", "نجح",
+            // عرض رسالة انتظار
+            this.Cursor = Cursors.WaitCursor;
+            _screenshotButton.Enabled = false;
+            _screenshotButton.Text = "⏳ جاري التقاط...";
+            
+            // السماح للـ UI بالتحديث
+            System.Windows.Forms.Application.DoEvents();
+            
+            // التقاط صورة كاملة للصفحة
+            string imagePath = await CaptureFullPageScreenshot(dateRangeText);
+            
+            // استعادة حالة الزرار
+            this.Cursor = Cursors.Default;
+            _screenshotButton.Enabled = true;
+            _screenshotButton.Text = "📸 لقطة شاشة";
+            
+            if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath))
+            {
+                ShowError("فشل التقاط الصورة");
+                return;
+            }
+            
+            // فتح مستكشف الملفات مع تحديد الصورة
+            System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{imagePath}\"");
+            
+            MessageBox.Show($"✅ تم حفظ لقطة الشاشة بنجاح!\n\n📁 الملف:\n{imagePath}", "نجح",
                 MessageBoxButtons.OK, MessageBoxIcon.Information,
                 MessageBoxDefaultButton.Button1,
                 MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
         }
         catch (Exception ex)
         {
+            this.Cursor = Cursors.Default;
+            _screenshotButton.Enabled = true;
+            _screenshotButton.Text = "📸 لقطة شاشة";
             ShowError($"خطأ في حفظ لقطة الشاشة:\n{ex.Message}");
         }
     }

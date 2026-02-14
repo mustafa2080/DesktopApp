@@ -267,6 +267,10 @@ public class AppDbContext : DbContext
     // Active Sessions
     public DbSet<ActiveSession> ActiveSessions { get; set; }
 
+    // File Manager
+    public DbSet<FileFolder> FileFolders { get; set; }
+    public DbSet<FileDocument> FileDocuments { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -2057,5 +2061,84 @@ public class AppDbContext : DbContext
             .HasColumnType("xid")
             .ValueGeneratedOnAddOrUpdate()
             .IsConcurrencyToken();
+
+        // ════════════════════════════════════════════════════════════════
+        // FILE MANAGER CONFIGURATION
+        // ════════════════════════════════════════════════════════════════
+        
+        modelBuilder.Entity<FileFolder>(entity =>
+        {
+            entity.ToTable("filefolders");
+            entity.HasKey(e => e.FolderId);
+            
+            entity.Property(e => e.FolderId).HasColumnName("folderid");
+            entity.Property(e => e.FolderName).HasColumnName("foldername").IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(500);
+            entity.Property(e => e.Color).HasColumnName("color").HasMaxLength(50);
+            entity.Property(e => e.Icon).HasColumnName("icon").HasMaxLength(50);
+            entity.Property(e => e.ParentFolderId).HasColumnName("parentfolderid");
+            entity.Property(e => e.DisplayOrder).HasColumnName("displayorder");
+            entity.Property(e => e.IsSystem).HasColumnName("issystem");
+            entity.Property(e => e.CreatedAt).HasColumnName("createdat").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.CreatedBy).HasColumnName("createdby");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updatedat").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.UpdatedBy).HasColumnName("updatedby");
+
+            // Self-referencing relationship
+            entity.HasOne(e => e.ParentFolder)
+                .WithMany(e => e.SubFolders)
+                .HasForeignKey(e => e.ParentFolderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Creator relationship
+            entity.HasOne(e => e.Creator)
+                .WithMany()
+                .HasForeignKey(e => e.CreatedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => e.ParentFolderId);
+            entity.HasIndex(e => e.CreatedBy);
+        });
+
+        modelBuilder.Entity<FileDocument>(entity =>
+        {
+            entity.ToTable("filedocuments");
+            entity.HasKey(e => e.DocumentId);
+            
+            entity.Property(e => e.DocumentId).HasColumnName("documentid");
+            entity.Property(e => e.FolderId).HasColumnName("folderid");
+            entity.Property(e => e.FileName).HasColumnName("filename").IsRequired().HasMaxLength(300);
+            entity.Property(e => e.OriginalFileName).HasColumnName("originalfilename").IsRequired().HasMaxLength(300);
+            entity.Property(e => e.FilePath).HasColumnName("filepath").IsRequired().HasMaxLength(500);
+            entity.Property(e => e.FileExtension).HasColumnName("fileextension").HasMaxLength(100);
+            entity.Property(e => e.FileSize).HasColumnName("filesize");
+            entity.Property(e => e.DocumentType).HasColumnName("documenttype");
+            entity.Property(e => e.MimeType).HasColumnName("mimetype").HasMaxLength(100);
+            entity.Property(e => e.Description).HasColumnName("description").HasMaxLength(1000);
+            entity.Property(e => e.Tags).HasColumnName("tags").HasMaxLength(500);
+            entity.Property(e => e.IsFavorite).HasColumnName("isfavorite");
+            entity.Property(e => e.DownloadCount).HasColumnName("downloadcount");
+            entity.Property(e => e.UploadedAt).HasColumnName("uploadedat").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.UploadedBy).HasColumnName("uploadedby");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updatedat").HasColumnType("timestamp with time zone");
+            entity.Property(e => e.UpdatedBy).HasColumnName("updatedby");
+
+            // Folder relationship
+            entity.HasOne(e => e.Folder)
+                .WithMany(e => e.Documents)
+                .HasForeignKey(e => e.FolderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Uploader relationship
+            entity.HasOne(e => e.Uploader)
+                .WithMany()
+                .HasForeignKey(e => e.UploadedBy)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(e => e.FolderId);
+            entity.HasIndex(e => e.UploadedBy);
+            entity.HasIndex(e => e.DocumentType);
+            entity.HasIndex(e => e.IsFavorite);
+        });
     }
 }

@@ -224,6 +224,10 @@ static class Program
         services.AddTransient<AuditService>();
         services.AddTransient<IAuditService>(sp => sp.GetRequiredService<AuditService>());
         
+        // File Manager Service - Transient
+        services.AddTransient<FileManagerService>();
+        services.AddTransient<IFileManagerService>(sp => sp.GetRequiredService<FileManagerService>());
+        
         services.AddTransient<ICashBoxService, CashBoxService>();
         services.AddTransient<IInvoiceService, InvoiceService>();
         
@@ -242,6 +246,7 @@ static class Program
         services.AddTransient<AddEditUmrahPackageForm>();
         services.AddTransient<BackupManagementForm>();
         services.AddTransient<ActiveSessionsForm>();
+        services.AddTransient<FileManagerForm>();
         
         Console.WriteLine("  - Building ServiceProvider...");
         ServiceProvider = services.BuildServiceProvider();

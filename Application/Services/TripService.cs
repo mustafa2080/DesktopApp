@@ -196,72 +196,66 @@ public class TripService : ITripService
         Console.WriteLine($"🎫 TotalCapacity: {trip.TotalCapacity}");
         Console.WriteLine("════════════════════════════════════════");
         
-        // ✅ CRITICAL: Detach all incoming entities to avoid tracking conflicts
+        // ✅ Clear tracker to avoid conflicts with passed-in entity
         _context.ChangeTracker.Clear();
         
-        var existingTrip = await _context.Trips
-            .Include(t => t.Programs)
-            .Include(t => t.Transportation)
-            .Include(t => t.Accommodations)
-            .Include(t => t.Guides)
-            .Include(t => t.OptionalTours)
-            .Include(t => t.Expenses)
-            .FirstOrDefaultAsync(t => t.TripId == trip.TripId);
-            
-        if (existingTrip == null)
-        {
-            Console.WriteLine("❌ Trip not found!");
-            throw new Exception("الرحلة غير موجودة");
-        }
+        // ════════════════════════════════════════════════════════════
+        // STEP 1: Update basic trip fields using raw SQL (bypass tracking)
+        // ════════════════════════════════════════════════════════════
+        Console.WriteLine("📝 Step 1: Updating basic trip fields...");
         
-        Console.WriteLine($"✅ Existing trip found");
-        Console.WriteLine($"   Old Description: '{existingTrip.Description}'");
-        Console.WriteLine($"   Old AdultCount: {existingTrip.AdultCount}");
-        Console.WriteLine($"   Old ChildCount: {existingTrip.ChildCount}");
+        await _context.Database.ExecuteSqlInterpolatedAsync(
+            $@"UPDATE trips SET
+                tripname              = {trip.TripName},
+                destination           = {trip.Destination},
+                triptype              = {(int)trip.TripType},
+                description           = {trip.Description},
+                startdate             = {trip.StartDate.ToUniversalTime()},
+                enddate               = {trip.EndDate.ToUniversalTime()},
+                totalcapacity         = {trip.TotalCapacity},
+                adultcount            = {trip.AdultCount},
+                childcount            = {trip.ChildCount},
+                sellingpriceperperson = {trip.SellingPricePerPerson},
+                currencyid            = {trip.CurrencyId},
+                exchangerate          = {trip.ExchangeRate},
+                totalcost             = {trip.TotalCost},
+                status                = {(int)trip.Status},
+                ispublished           = {trip.IsPublished},
+                isactive              = {trip.IsActive},
+                updatedby             = {trip.UpdatedBy},
+                updatedat             = {DateTime.UtcNow}
+            WHERE tripid = {trip.TripId}");
         
-        // تحديث المعلومات الأساسية
-        existingTrip.TripName = trip.TripName;
-        existingTrip.Destination = trip.Destination;
-        existingTrip.TripType = trip.TripType;
-        existingTrip.Description = trip.Description;
-        existingTrip.StartDate = trip.StartDate;
-        existingTrip.EndDate = trip.EndDate;
-        existingTrip.TotalCapacity = trip.TotalCapacity;
-        existingTrip.AdultCount = trip.AdultCount;
-        existingTrip.ChildCount = trip.ChildCount;
-        existingTrip.SellingPricePerPerson = trip.SellingPricePerPerson;
-        existingTrip.CurrencyId = trip.CurrencyId;
-        existingTrip.ExchangeRate = trip.ExchangeRate;
-        existingTrip.TotalCost = trip.TotalCost;
-        existingTrip.Status = trip.Status;
-        existingTrip.IsPublished = trip.IsPublished;
-        existingTrip.IsActive = trip.IsActive;
-        existingTrip.UpdatedBy = trip.UpdatedBy;
-        existingTrip.UpdatedAt = DateTime.UtcNow;
+        Console.WriteLine("✅ Basic fields updated via SQL");
         
-        Console.WriteLine($"🔧 After update:");
-        Console.WriteLine($"   New Description: '{existingTrip.Description}'");
-        Console.WriteLine($"   New Destination: '{existingTrip.Destination}'");
-        Console.WriteLine($"   New AdultCount: {existingTrip.AdultCount}");
-        Console.WriteLine($"   New ChildCount: {existingTrip.ChildCount}");
+        var tripId = trip.TripId;
         
-        // ✅ CRITICAL FIX: Clear ChangeTracker before ANY database operations
+        // ════════════════════════════════════════════════════════════
+        // STEP 2: Delete all child collections via raw SQL
+        // ════════════════════════════════════════════════════════════
+        Console.WriteLine("🗑️ Step 2: Deleting old child records...");
+        
+        await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM tripprograms WHERE tripid = {tripId}");
+        await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM triptransportations WHERE tripid = {tripId}");
+        await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM tripaccommodations WHERE tripid = {tripId}");
+        await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM tripguides WHERE tripid = {tripId}");
+        await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM tripoptionaltours WHERE tripid = {tripId}");
+        await _context.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM tripexpenses WHERE tripid = {tripId}");
+        
+        Console.WriteLine("✅ Old records deleted");
+        
+        // ════════════════════════════════════════════════════════════
+        // STEP 3: Re-insert child collections via EF (clean tracker)
+        // ════════════════════════════════════════════════════════════
+        Console.WriteLine("➕ Step 3: Adding new child records...");
         _context.ChangeTracker.Clear();
         
-        // حذف وإعادة إنشاء البيانات المرتبطة
         // البرنامج اليومي
-        _context.TripPrograms.RemoveRange(existingTrip.Programs);
-        await _context.SaveChangesAsync(); // ✅ حفظ الحذف أولاً
-        
-        // ✅ CRITICAL: Clear tracker again after delete
-        _context.ChangeTracker.Clear();
-        
         foreach (var program in trip.Programs)
         {
-            var newProgram = new TripProgram
+            _context.TripPrograms.Add(new TripProgram
             {
-                // ✅ CRITICAL: Don't set TripProgramId - let DB generate it
-                TripId = existingTrip.TripId,
+                TripId = tripId,
                 DayNumber = program.DayNumber,
                 DayTitle = program.DayTitle,
                 DayDate = program.DayDate,
@@ -274,23 +268,15 @@ public class TripService : ITripService
                 DriverTip = program.DriverTip,
                 BookingType = program.BookingType,
                 Notes = program.Notes
-            };
-            _context.TripPrograms.Add(newProgram);
+            });
         }
         
         // النقل
-        _context.TripTransportations.RemoveRange(existingTrip.Transportation);
-        await _context.SaveChangesAsync(); // ✅ حفظ الحذف أولاً
-        
-        // ✅ CRITICAL: Clear tracker again after delete
-        _context.ChangeTracker.Clear();
-        
         foreach (var transport in trip.Transportation)
         {
-            var newTransport = new TripTransportation
+            _context.TripTransportations.Add(new TripTransportation
             {
-                // ✅ CRITICAL: Don't set TripTransportationId - let DB generate it
-                TripId = existingTrip.TripId,
+                TripId = tripId,
                 Type = transport.Type,
                 TransportDate = transport.TransportDate,
                 Route = transport.Route,
@@ -303,23 +289,15 @@ public class TripService : ITripService
                 DriverTip = transport.DriverTip,
                 SupplierName = transport.SupplierName,
                 DriverPhone = transport.DriverPhone
-            };
-            _context.TripTransportations.Add(newTransport);
+            });
         }
         
         // الإقامة
-        _context.TripAccommodations.RemoveRange(existingTrip.Accommodations);
-        await _context.SaveChangesAsync(); // ✅ حفظ الحذف أولاً
-        
-        // ✅ CRITICAL: Clear tracker again after delete
-        _context.ChangeTracker.Clear();
-        
         foreach (var accommodation in trip.Accommodations)
         {
-            var newAccommodation = new TripAccommodation
+            _context.TripAccommodations.Add(new TripAccommodation
             {
-                // ✅ CRITICAL: Don't set TripAccommodationId - let DB generate it
-                TripId = existingTrip.TripId,
+                TripId = tripId,
                 Type = accommodation.Type,
                 HotelName = accommodation.HotelName,
                 Rating = accommodation.Rating,
@@ -334,23 +312,15 @@ public class TripService : ITripService
                 MealPlan = accommodation.MealPlan,
                 CheckInDate = accommodation.CheckInDate,
                 CheckOutDate = accommodation.CheckOutDate
-            };
-            _context.TripAccommodations.Add(newAccommodation);
+            });
         }
         
         // المرشدين
-        _context.TripGuides.RemoveRange(existingTrip.Guides);
-        await _context.SaveChangesAsync(); // ✅ حفظ الحذف أولاً
-        
-        // ✅ CRITICAL: Clear tracker again after delete
-        _context.ChangeTracker.Clear();
-        
         foreach (var guide in trip.Guides)
         {
-            var newGuide = new TripGuide
+            _context.TripGuides.Add(new TripGuide
             {
-                // ✅ CRITICAL: Don't set TripGuideId - let DB generate it
-                TripId = existingTrip.TripId,
+                TripId = tripId,
                 GuideName = guide.GuideName,
                 Phone = guide.Phone,
                 Email = guide.Email,
@@ -359,66 +329,44 @@ public class TripService : ITripService
                 CommissionPercentage = guide.CommissionPercentage,
                 CommissionAmount = guide.CommissionAmount,
                 Notes = guide.Notes
-            };
-            _context.TripGuides.Add(newGuide);
+            });
         }
         
         // الرحلات الاختيارية
-        _context.TripOptionalTours.RemoveRange(existingTrip.OptionalTours);
-        await _context.SaveChangesAsync(); // ✅ حفظ الحذف أولاً
-        
-        // ✅ CRITICAL: Clear tracker again after delete
-        _context.ChangeTracker.Clear();
-        
         foreach (var tour in trip.OptionalTours)
         {
-            var newTour = new TripOptionalTour
+            _context.TripOptionalTours.Add(new TripOptionalTour
             {
-                // ✅ CRITICAL: Don't set TripOptionalTourId - let DB generate it
-                TripId = existingTrip.TripId,
+                TripId = tripId,
                 TourName = tour.TourName,
                 ParticipantsCount = tour.ParticipantsCount,
                 SellingPrice = tour.SellingPrice,
                 PurchasePrice = tour.PurchasePrice,
                 GuideCommission = tour.GuideCommission,
                 SalesRepCommission = tour.SalesRepCommission
-            };
-            _context.TripOptionalTours.Add(newTour);
+            });
         }
         
         // المصاريف
-        _context.TripExpenses.RemoveRange(existingTrip.Expenses);
-        await _context.SaveChangesAsync(); // ✅ حفظ الحذف أولاً
-        
-        // ✅ CRITICAL: Clear tracker again after delete
-        _context.ChangeTracker.Clear();
-        
         foreach (var expense in trip.Expenses)
         {
-            var newExpense = new TripExpense
+            _context.TripExpenses.Add(new TripExpense
             {
-                // ✅ CRITICAL: Don't set TripExpenseId - let DB generate it
-                TripId = existingTrip.TripId,
+                TripId = tripId,
                 ExpenseType = expense.ExpenseType,
                 Description = expense.Description,
                 Amount = expense.Amount,
                 ExpenseDate = expense.ExpenseDate
-            };
-            _context.TripExpenses.Add(newExpense);
+            });
         }
         
-        // ✅ حفظ جميع التغييرات دفعة واحدة
-        Console.WriteLine("💾 Calling SaveChangesAsync...");
+        // ✅ حفظ جميع الأبناء الجديدة
+        Console.WriteLine("💾 Saving all new child records...");
         
         try
         {
             int changesCount = await _context.SaveChangesAsync();
             Console.WriteLine($"✅ SaveChanges completed! Changes saved: {changesCount}");
-            
-            // ✅ إعادة حساب التكلفة الإجمالية بعد الحفظ
-            existingTrip.CalculateTotalCost();
-            await _context.SaveChangesAsync(); // حفظ التكلفة المحدثة
-            Console.WriteLine($"💰 Total cost recalculated: {existingTrip.TotalCost:N2}");
             
             // ✅ Audit Log: Trip Updated
             if (_auditService != null)
@@ -426,9 +374,9 @@ public class TripService : ITripService
                 await _auditService.LogAsync(
                     AuditAction.Update,
                     "Trip",
-                    existingTrip.TripId,
-                    $"{existingTrip.Destination} - {existingTrip.StartDate:dd/MM/yyyy}",
-                    $"تم تعديل الرحلة: {existingTrip.Destination}"
+                    tripId,
+                    $"{trip.Destination} - {trip.StartDate:dd/MM/yyyy}",
+                    $"تم تعديل الرحلة: {trip.Destination}"
                 );
             }
         }
@@ -443,7 +391,7 @@ public class TripService : ITripService
         
         Console.WriteLine("════════════════════════════════════════");
         
-        return existingTrip;
+        return trip;
     }
     
     public async Task<bool> DeleteTripAsync(int tripId)

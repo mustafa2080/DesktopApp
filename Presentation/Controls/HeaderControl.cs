@@ -163,68 +163,118 @@ public class HeaderControl : Panel
     {
         Panel panel = new Panel
         {
-            Size = new Size(450, 55),
+            Size = new Size(600, 60), // زيادة العرض والارتفاع
             BackColor = Color.Transparent
         };
 
-        // Stat 1: Today Revenue
-        var stat1 = CreateQuickStat("💰", "---", "إيرادات اليوم", 0, out _lblTodayRevenue);
+        // Stat 1: Today Revenue مع خلفية مميزة
+        var stat1 = CreateQuickStat("💰", "---", "إيرادات اليوم", 0, Color.FromArgb(34, 197, 94), out _lblTodayRevenue);
         panel.Controls.Add(stat1);
 
-        // Stat 2: Pending Invoices
-        var stat2 = CreateQuickStat("📄", "---", "فواتير معلقة", 150, out _lblPendingInvoices);
+        // Stat 2: Pending Invoices مع خلفية مميزة
+        var stat2 = CreateQuickStat("📄", "---", "فواتير معلقة", 200, Color.FromArgb(239, 68, 68), out _lblPendingInvoices);
         panel.Controls.Add(stat2);
 
-        // Stat 3: Active Reservations
-        var stat3 = CreateQuickStat("✈️", "---", "حجوزات نشطة", 300, out _lblActiveReservations);
+        // Stat 3: Active Reservations مع خلفية مميزة
+        var stat3 = CreateQuickStat("✈️", "---", "حجوزات نشطة", 400, Color.FromArgb(59, 130, 246), out _lblActiveReservations);
         panel.Controls.Add(stat3);
 
         return panel;
     }
 
-    private Panel CreateQuickStat(string icon, string value, string label, int xPos, out Label valueLabel)
+    private Panel CreateQuickStat(string icon, string value, string label, int xPos, Color accentColor, out Label valueLabel)
     {
         Panel statPanel = new Panel
         {
-            Size = new Size(140, 55),
+            Size = new Size(190, 60),
             Location = new Point(xPos, 0),
-            BackColor = Color.Transparent
+            BackColor = Color.FromArgb(250, 251, 252), // خلفية فاتحة بدلاً من بيضاء تماماً
+            Cursor = Cursors.Hand
         };
 
+        // رسم border وتأثيرات
+        statPanel.Paint += (s, e) =>
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            
+            // خلفية ملونة كاملة بدلاً من شفافة
+            using var bgBrush = new SolidBrush(accentColor);
+            using var bgPath = RoundedRect(new Rectangle(0, 0, statPanel.Width, statPanel.Height), 10);
+            g.FillPath(bgBrush, bgPath);
+            
+            // Border أبيض خفيف للتحديد
+            using var pen = new Pen(Color.FromArgb(80, 255, 255, 255), 2);
+            g.DrawPath(pen, bgPath);
+        };
+
+        // أيقونة بيضاء كبيرة
         var lblIcon = new Label
         {
             Text = icon,
-            Font = new Font("Segoe UI Emoji", 12F),
-            ForeColor = ColorScheme.Primary,
+            Font = new Font("Segoe UI Emoji", 24F), // أكبر
+            ForeColor = Color.White, // أبيض على الخلفية الملونة
             AutoSize = true,
-            Location = new Point(5, 8),
+            Location = new Point(10, 15),
             BackColor = Color.Transparent
         };
         statPanel.Controls.Add(lblIcon);
 
+        // القيمة بيضاء كبيرة وواضحة
         valueLabel = new Label
         {
             Text = value,
-            Font = new Font("Cairo", 11F, FontStyle.Bold),
-            ForeColor = ColorScheme.Primary,
+            Font = new Font("Cairo", 18F, FontStyle.Bold), // أكبر جداً
+            ForeColor = Color.White, // أبيض واضح
             AutoSize = true,
-            Location = new Point(30, 8),
+            Location = new Point(55, 10),
             BackColor = Color.Transparent
         };
         statPanel.Controls.Add(valueLabel);
 
+        // التسمية بيضاء
         var lblLabel = new Label
         {
             Text = label,
-            Font = new Font("Cairo", 8F),
-            ForeColor = ColorScheme.TextSecondary,
+            Font = new Font("Cairo", 9F, FontStyle.Regular),
+            ForeColor = Color.FromArgb(230, 255, 255, 255), // أبيض شفاف قليلاً
             AutoSize = true,
-            Location = new Point(30, 30),
+            Location = new Point(55, 38),
             BackColor = Color.Transparent
         };
         statPanel.Controls.Add(lblLabel);
 
+        // تأثير hover - تغميق الخلفية
+        statPanel.MouseEnter += (s, e) =>
+        {
+            // تغميق اللون
+            int r = Math.Max(0, accentColor.R - 30);
+            int g = Math.Max(0, accentColor.G - 30);
+            int b = Math.Max(0, accentColor.B - 30);
+            statPanel.BackColor = Color.FromArgb(r, g, b);
+            statPanel.Invalidate();
+        };
+        statPanel.MouseLeave += (s, e) =>
+        {
+            statPanel.BackColor = Color.FromArgb(250, 251, 252);
+            statPanel.Invalidate();
+        };
+
         return statPanel;
+    }
+    
+    private System.Drawing.Drawing2D.GraphicsPath RoundedRect(Rectangle bounds, int radius)
+    {
+        var path = new System.Drawing.Drawing2D.GraphicsPath();
+        int d = radius * 2;
+        
+        path.AddArc(bounds.X, bounds.Y, d, d, 180, 90);
+        path.AddArc(bounds.Right - d, bounds.Y, d, d, 270, 90);
+        path.AddArc(bounds.Right - d, bounds.Bottom - d, d, d, 0, 90);
+        path.AddArc(bounds.X, bounds.Bottom - d, d, d, 90, 90);
+        path.CloseFigure();
+        
+        return path;
     }
 
     private async Task LoadHeaderStatsAsync()

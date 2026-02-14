@@ -81,7 +81,7 @@ public partial class MainForm : Form
         mainLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         // Row styles: Header | Content
-        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 85)); // زيادة من 70 إلى 85
         mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         // Create Sidebar
@@ -625,6 +625,10 @@ public partial class MainForm : Form
                     ShowAccountingReports();
                     break;
 
+                case "filemanager":
+                    ShowFileManager();
+                    break;
+
                 default:
                     ShowDashboard();
                     break;
@@ -861,6 +865,19 @@ public partial class MainForm : Form
         umrahProfitForm.Show();
         tabControl.TabPages.Add(umrahProfitTab);
         
+        // Tab 8: Fawateerk Payments Report
+        var fawateerkTab = new TabPage("💳 تقرير دفعات فواتيرك");
+        var dbContext = _serviceProvider.GetRequiredService<Infrastructure.Data.AppDbContext>();
+        var fawateerkForm = new FawateerkPaymentsReportForm(dbContext, _currentUserId)
+        {
+            TopLevel = false,
+            FormBorderStyle = FormBorderStyle.None,
+            Dock = DockStyle.Fill
+        };
+        fawateerkTab.Controls.Add(fawateerkForm);
+        fawateerkForm.Show();
+        tabControl.TabPages.Add(fawateerkTab);
+        
         _contentPanel?.Controls.Add(tabControl);
     }
 
@@ -886,6 +903,35 @@ public partial class MainForm : Form
         {
             Console.WriteLine($"❌ Error showing calculator: {ex.Message}");
             MessageBox.Show($"حدث خطأ عند فتح الآلة الحاسبة: {ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error,
+                MessageBoxDefaultButton.Button1,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+        }
+    }
+
+    private void ShowFileManager()
+    {
+        if (_contentPanel == null) return;
+        
+        _contentPanel.Controls.Clear();
+        
+        try
+        {
+            var fileService = _serviceProvider.GetRequiredService<IFileManagerService>();
+            var fileManagerForm = new FileManagerForm(fileService, _currentUserId)
+            {
+                TopLevel = false,
+                FormBorderStyle = FormBorderStyle.None,
+                Dock = DockStyle.Fill
+            };
+            
+            _contentPanel.Controls.Add(fileManagerForm);
+            fileManagerForm.Show();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error showing file manager: {ex.Message}");
+            MessageBox.Show($"حدث خطأ عند فتح مدير الملفات: {ex.Message}", "خطأ",
                 MessageBoxButtons.OK, MessageBoxIcon.Error,
                 MessageBoxDefaultButton.Button1,
                 MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);

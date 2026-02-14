@@ -497,6 +497,18 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                                 bank.ModifiedBy = _currentUserId;
                             }
 
+                            // Get trip info if selected
+                            string tripInfo = "";
+                            if (cmbTrip.SelectedValue != null && Convert.ToInt32(cmbTrip.SelectedValue) > 0)
+                            {
+                                int tripId = Convert.ToInt32(cmbTrip.SelectedValue);
+                                var trip = _context.Set<Trip>().FirstOrDefault(t => t.TripId == tripId);
+                                if (trip != null)
+                                {
+                                    tripInfo = $"\nالرحلة: {trip.TripName} - {trip.StartDate:dd/MM/yyyy}";
+                                }
+                            }
+
                             // Create bank transfer record
                             var transfer = new BankTransfer
                             {
@@ -505,7 +517,7 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                                 TransferType = "FawateerkPayment",
                                 TransferDate = DateTime.SpecifyKind(dtpPaymentDate.Value, DateTimeKind.Utc),
                                 ReferenceNumber = txtReferenceNumber.Text.Trim(),
-                                Notes = $"دفعة من فواتيرك - العميل: {cmbCustomer.Text}\n{txtNotes.Text.Trim()}",
+                                Notes = $"دفعة من فواتيرك - العميل: {cmbCustomer.Text}{tripInfo}\n{txtNotes.Text.Trim()}",
                                 CreatedBy = _currentUserId,
                                 CreatedDate = DateTime.UtcNow
                             };

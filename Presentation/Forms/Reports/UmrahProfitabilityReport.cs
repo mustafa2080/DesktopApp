@@ -1,6 +1,7 @@
 ﻿using GraceWay.AccountingSystem.Application.Services;
 using GraceWay.AccountingSystem.Domain.Entities;
 using System.Drawing.Drawing2D;
+using System.Drawing.Printing;
 
 namespace GraceWay.AccountingSystem.Presentation.Forms.Reports;
 
@@ -30,6 +31,7 @@ public partial class UmrahProfitabilityReport : Form
     private DataGridView _detailGrid = null!;
     private Label _detailTitleLabel = null!;
     private Button _exportDetailsButton = null!;
+    private Button _printDetailsButton = null!;
     private SplitContainer _splitContainer = null!;
     private UmrahPackage? _selectedPackage = null;
     
@@ -414,24 +416,17 @@ public partial class UmrahProfitabilityReport : Form
         Panel detailHeaderPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 40,
+            Height = 80, // زيادة الارتفاع لاستيعاب الأزرار
             BackColor = Color.FromArgb(41, 128, 185)
         };
         
-        // Detail title
-        _detailTitleLabel = new Label
+        // Panel للأزرار في الأعلى
+        Panel buttonsPanel = new Panel
         {
-            Text = "📋 تفاصيل حسابات الرحلة — اضغط على حزمة لعرض التفاصيل",
-            Font = new Font("Cairo", 12F, FontStyle.Bold),
-            ForeColor = Color.White,
-            BackColor = Color.Transparent,
-            AutoSize = false,
+            Dock = DockStyle.Top,
             Height = 40,
-            TextAlign = ContentAlignment.MiddleRight,
-            Padding = new Padding(15, 0, 180, 0),
-            Dock = DockStyle.Fill
+            BackColor = Color.Transparent
         };
-        detailHeaderPanel.Controls.Add(_detailTitleLabel);
         
         // Export Details Button
         _exportDetailsButton = new Button
@@ -443,19 +438,56 @@ public partial class UmrahProfitabilityReport : Form
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Cursor = Cursors.Hand,
-            Enabled = false  // معطل في البداية
+            Enabled = false
         };
         _exportDetailsButton.FlatAppearance.BorderSize = 0;
         _exportDetailsButton.Click += ExportDetailsToExcel_Click;
         
-        // وضع الزر على اليسار
-        detailHeaderPanel.Resize += (s, e) => 
+        // Print Details Button
+        _printDetailsButton = new Button
         {
-            _exportDetailsButton.Location = new Point(10, 5);
+            Text = "🖨️ طباعة التفاصيل",
+            Font = new Font("Cairo", 9F, FontStyle.Bold),
+            Size = new Size(160, 30),
+            BackColor = Color.FromArgb(52, 152, 219),
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand,
+            Enabled = false
         };
-        _exportDetailsButton.Location = new Point(10, 5);
+        _printDetailsButton.FlatAppearance.BorderSize = 0;
+        _printDetailsButton.Click += PrintDetails_Click;
         
-        detailHeaderPanel.Controls.Add(_exportDetailsButton);
+        // وضع الأزرار على اليمين مع Resize event
+        buttonsPanel.Resize += (s, e) =>
+        {
+            if (buttonsPanel.Width > 0)
+            {
+                _printDetailsButton.Location = new Point(buttonsPanel.Width - 170, 5);
+                _exportDetailsButton.Location = new Point(buttonsPanel.Width - 340, 5);
+            }
+        };
+        
+        buttonsPanel.Controls.Add(_exportDetailsButton);
+        buttonsPanel.Controls.Add(_printDetailsButton);
+        
+        // Detail title
+        _detailTitleLabel = new Label
+        {
+            Text = "📋 تفاصيل حسابات الرحلة — اضغط على حزمة لعرض التفاصيل",
+            Font = new Font("Cairo", 12F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.Transparent,
+            AutoSize = false,
+            Height = 40,
+            TextAlign = ContentAlignment.MiddleRight,
+            Padding = new Padding(15, 0, 15, 0),
+            Dock = DockStyle.Fill
+        };
+        
+        // ✅ إضافة الـ Label أولاً ثم الـ buttonsPanel لضمان ظهور الأزرار فوق النص
+        detailHeaderPanel.Controls.Add(_detailTitleLabel);
+        detailHeaderPanel.Controls.Add(buttonsPanel);
         
         _detailGrid = new DataGridView
         {
@@ -985,8 +1017,9 @@ public partial class UmrahProfitabilityReport : Form
         // حفظ الباكج المختارة
         _selectedPackage = package;
         
-        // تفعيل زر التصدير
+        // تفعيل الأزرار
         _exportDetailsButton.Enabled = true;
+        _printDetailsButton.Enabled = true;
         
         _detailGrid.Rows.Clear();
         
@@ -1683,6 +1716,312 @@ public partial class UmrahProfitabilityReport : Form
             MessageBox.Show($"خطأ في تصدير التفاصيل: {ex.Message}", "خطأ",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+    
+    private void PrintDetails_Click(object? sender, EventArgs e)
+    {
+        if (_selectedPackage == null)
+        {
+            MessageBox.Show("لم يتم اختيار باكج", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            // إنشاء PrintDocument
+            System.Drawing.Printing.PrintDocument printDocument = new System.Drawing.Printing.PrintDocument();
+            printDocument.PrintPage += PrintDocument_PrintPage;
+            
+            // إنشاء PrintPreviewDialog
+            PrintPreviewDialog previewDialog = new PrintPreviewDialog
+            {
+                Document = printDocument,
+                Width = 1000,
+                Height = 700,
+                StartPosition = FormStartPosition.CenterScreen,
+                RightToLeft = RightToLeft.Yes,
+                RightToLeftLayout = true
+            };
+            
+            previewDialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"خطأ في الطباعة: {ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+    
+    private void PrintDocument_PrintPage(object sender, System.Drawing.Printing.PrintPageEventArgs e)
+    {
+        if (_selectedPackage == null || e.Graphics == null) return;
+
+        try
+        {
+            Graphics g = e.Graphics;
+            Font titleFont = new Font("Cairo", 18F, FontStyle.Bold);
+            Font headerFont = new Font("Cairo", 14F, FontStyle.Bold);
+            Font labelFont = new Font("Cairo", 11F, FontStyle.Bold);
+            Font valueFont = new Font("Cairo", 11F);
+            Font tableHeaderFont = new Font("Cairo", 10F, FontStyle.Bold);
+            Font tableCellFont = new Font("Cairo", 10F);
+            
+            Brush blackBrush = Brushes.Black;
+            Brush blueBrush = new SolidBrush(Color.FromArgb(52, 152, 219));
+            Brush grayBrush = new SolidBrush(Color.FromArgb(127, 140, 141));
+            Brush greenBrush = new SolidBrush(Color.FromArgb(46, 204, 113));
+            Brush redBrush = new SolidBrush(Color.FromArgb(231, 76, 60));
+            
+            float yPos = 50;
+            float margin = 50;
+            float pageWidth = e.PageBounds.Width - (2 * margin);
+            
+            // العنوان الرئيسي
+            string title = "🕌 تقرير تفاصيل حسابات العمرة";
+            SizeF titleSize = g.MeasureString(title, titleFont);
+            g.DrawString(title, titleFont, blueBrush, 
+                e.PageBounds.Width - margin - titleSize.Width, yPos);
+            yPos += titleSize.Height + 10;
+            
+            // خط فاصل
+            g.DrawLine(new Pen(blueBrush, 2), margin, yPos, e.PageBounds.Width - margin, yPos);
+            yPos += 20;
+            
+            // معلومات الباكج في صندوق
+            float boxY = yPos;
+            Brush boxBrush = new SolidBrush(Color.FromArgb(245, 247, 250));
+            g.FillRectangle(boxBrush, margin, boxY, pageWidth, 120);
+            g.DrawRectangle(new Pen(Color.FromArgb(200, 200, 200), 1), margin, boxY, pageWidth, 120);
+            
+            yPos = boxY + 10;
+            g.DrawString("معلومات الباكج", headerFont, blueBrush, 
+                e.PageBounds.Width - margin - g.MeasureString("معلومات الباكج", headerFont).Width - 10, yPos);
+            yPos += 35;
+            
+            // رقم الباكج
+            DrawLabelValue(g, "رقم الباكج:", _selectedPackage.PackageNumber, 
+                labelFont, valueFont, blackBrush, margin, ref yPos, pageWidth);
+            
+            // اسم الرحلة
+            DrawLabelValue(g, "اسم الرحلة:", _selectedPackage.TripName, 
+                labelFont, valueFont, blackBrush, margin, ref yPos, pageWidth);
+            
+            // عدد الأفراد
+            DrawLabelValue(g, "عدد الأفراد:", _selectedPackage.NumberOfPersons.ToString() + " فرد", 
+                labelFont, valueFont, blackBrush, margin, ref yPos, pageWidth);
+            
+            yPos = boxY + 130;
+            
+            // الملخص المالي في صندوق مميز
+            boxY = yPos;
+            Brush summaryBoxBrush = new SolidBrush(Color.FromArgb(236, 240, 241));
+            g.FillRectangle(summaryBoxBrush, margin, boxY, pageWidth, 150);
+            g.DrawRectangle(new Pen(blueBrush, 2), margin, boxY, pageWidth, 150);
+            
+            yPos = boxY + 10;
+            g.DrawString("الملخص المالي", headerFont, blueBrush, 
+                e.PageBounds.Width - margin - g.MeasureString("الملخص المالي", headerFont).Width - 10, yPos);
+            yPos += 35;
+            
+            int persons = _selectedPackage.NumberOfPersons;
+            
+            // حساب الإجماليات من الـ Properties الصحيحة
+            decimal totalRevenue = _selectedPackage.TotalRevenue;
+            decimal totalCost = _selectedPackage.TotalCosts * persons;
+            decimal totalProfit = _selectedPackage.NetProfit;
+            decimal profitMargin = _selectedPackage.ProfitMargin;
+            
+            // استخدام فونت أكبر للأرقام المالية
+            Font financialFont = new Font("Cairo", 11F, FontStyle.Bold);
+            
+            DrawLabelValue(g, "💰 إجمالي الإيرادات:", $"{totalRevenue:N2} ج.م", 
+                labelFont, financialFont, greenBrush, margin, ref yPos, pageWidth);
+            
+            DrawLabelValue(g, "💸 إجمالي التكاليف:", $"{totalCost:N2} ج.م", 
+                labelFont, financialFont, redBrush, margin, ref yPos, pageWidth);
+            
+            DrawLabelValue(g, "📈 صافي الربح:", $"{totalProfit:N2} ج.م", 
+                labelFont, financialFont, totalProfit >= 0 ? greenBrush : redBrush, 
+                margin, ref yPos, pageWidth);
+            
+            DrawLabelValue(g, "📊 هامش الربح:", $"{profitMargin:F2}%", 
+                labelFont, financialFont, blackBrush, margin, ref yPos, pageWidth);
+            
+            yPos = boxY + 160;
+            
+            // جدول التفاصيل
+            g.DrawString("تفاصيل الحسابات", headerFont, blackBrush, 
+                e.PageBounds.Width - margin - g.MeasureString("تفاصيل الحسابات", headerFont).Width, yPos);
+            yPos += 35;
+            
+            // رسم الجدول
+            float colWidth1 = pageWidth * 0.40f; // البند - زيادة العرض
+            float colWidth2 = pageWidth * 0.20f; // للفرد
+            float colWidth3 = pageWidth * 0.20f; // الإجمالي
+            float colWidth4 = pageWidth * 0.10f; // العدد
+            float colWidth5 = pageWidth * 0.10f; // الملاحظات
+            
+            float tableStartX = margin;
+            float rowHeight = 35; // زيادة ارتفاع الصف
+            
+            // رأس الجدول مع border
+            Brush headerBrush = new SolidBrush(Color.FromArgb(52, 73, 94));
+            g.FillRectangle(headerBrush, tableStartX, yPos, pageWidth, rowHeight);
+            
+            // رسم border حول رأس الجدول
+            Pen tableBorderPen = new Pen(Color.FromArgb(52, 73, 94), 2);
+            g.DrawRectangle(tableBorderPen, tableStartX, yPos, pageWidth, rowHeight);
+            
+            StringFormat centerFormat = new StringFormat { 
+                Alignment = StringAlignment.Center, 
+                LineAlignment = StringAlignment.Center 
+            };
+            StringFormat rightFormat = new StringFormat { 
+                Alignment = StringAlignment.Far, 
+                LineAlignment = StringAlignment.Center,
+                FormatFlags = StringFormatFlags.DirectionRightToLeft
+            };
+            
+            float xPos = tableStartX;
+            
+            // رسم خطوط عمودية في رأس الجدول
+            g.DrawString("البند", tableHeaderFont, Brushes.White, 
+                new RectangleF(xPos + 5, yPos, colWidth1 - 10, rowHeight), rightFormat);
+            xPos += colWidth1;
+            g.DrawLine(Pens.White, xPos, yPos, xPos, yPos + rowHeight);
+            
+            g.DrawString("للفرد", tableHeaderFont, Brushes.White, 
+                new RectangleF(xPos, yPos, colWidth2, rowHeight), centerFormat);
+            xPos += colWidth2;
+            g.DrawLine(Pens.White, xPos, yPos, xPos, yPos + rowHeight);
+            
+            g.DrawString("الإجمالي", tableHeaderFont, Brushes.White, 
+                new RectangleF(xPos, yPos, colWidth3, rowHeight), centerFormat);
+            xPos += colWidth3;
+            g.DrawLine(Pens.White, xPos, yPos, xPos, yPos + rowHeight);
+            
+            g.DrawString("العدد", tableHeaderFont, Brushes.White, 
+                new RectangleF(xPos, yPos, colWidth4, rowHeight), centerFormat);
+            xPos += colWidth4;
+            g.DrawLine(Pens.White, xPos, yPos, xPos, yPos + rowHeight);
+            
+            g.DrawString("ملاحظات", tableHeaderFont, Brushes.White, 
+                new RectangleF(xPos, yPos, colWidth5, rowHeight), centerFormat);
+            
+            yPos += rowHeight;
+            
+            // صفوف البيانات من _detailGrid
+            Brush altRowBrush = new SolidBrush(Color.FromArgb(248, 249, 250));
+            Pen borderPen = new Pen(Color.FromArgb(220, 220, 220), 1);
+            
+            int rowIndex = 0;
+            foreach (DataGridViewRow row in _detailGrid.Rows)
+            {
+                if (yPos + rowHeight > e.PageBounds.Height - 100)
+                {
+                    // نهاية الصفحة
+                    break;
+                }
+                
+                // خلفية الصف
+                if (rowIndex % 2 == 1)
+                {
+                    g.FillRectangle(altRowBrush, tableStartX, yPos, pageWidth, rowHeight);
+                }
+                
+                // رسم border للصف
+                g.DrawRectangle(borderPen, tableStartX, yPos, pageWidth, rowHeight);
+                
+                xPos = tableStartX;
+                
+                // البند مع padding
+                string item = row.Cells[0].Value?.ToString() ?? "";
+                g.DrawString(item, tableCellFont, blackBrush, 
+                    new RectangleF(xPos + 5, yPos, colWidth1 - 10, rowHeight), rightFormat);
+                xPos += colWidth1;
+                g.DrawLine(borderPen, xPos, yPos, xPos, yPos + rowHeight);
+                
+                // للفرد
+                string perPerson = row.Cells[1].Value?.ToString() ?? "";
+                Brush cellBrush = item.Contains("إيراد") ? greenBrush : 
+                                 (item.Contains("تكلفة") ? redBrush : blackBrush);
+                g.DrawString(perPerson, tableCellFont, cellBrush, 
+                    new RectangleF(xPos, yPos, colWidth2, rowHeight), centerFormat);
+                xPos += colWidth2;
+                g.DrawLine(borderPen, xPos, yPos, xPos, yPos + rowHeight);
+                
+                // الإجمالي
+                string total = row.Cells[2].Value?.ToString() ?? "";
+                g.DrawString(total, tableCellFont, cellBrush, 
+                    new RectangleF(xPos, yPos, colWidth3, rowHeight), centerFormat);
+                xPos += colWidth3;
+                g.DrawLine(borderPen, xPos, yPos, xPos, yPos + rowHeight);
+                
+                // العدد
+                string count = row.Cells[3].Value?.ToString() ?? "";
+                g.DrawString(count, tableCellFont, blackBrush, 
+                    new RectangleF(xPos, yPos, colWidth4, rowHeight), centerFormat);
+                xPos += colWidth4;
+                g.DrawLine(borderPen, xPos, yPos, xPos, yPos + rowHeight);
+                
+                // الملاحظات
+                string notes = row.Cells.Count > 4 ? (row.Cells[4].Value?.ToString() ?? "") : "";
+                g.DrawString(notes, tableCellFont, grayBrush, 
+                    new RectangleF(xPos + 2, yPos, colWidth5 - 4, rowHeight), centerFormat);
+                
+                yPos += rowHeight;
+                rowIndex++;
+            }
+            
+            // رسم border نهائي حول الجدول
+            g.DrawRectangle(tableBorderPen, tableStartX, yPos - (rowIndex * rowHeight), 
+                pageWidth, rowIndex * rowHeight);
+            
+            // Footer
+            yPos = e.PageBounds.Height - 50;
+            string footer = $"تاريخ الطباعة: {DateTime.Now:yyyy/MM/dd HH:mm} • GraceWay Accounting System";
+            SizeF footerSize = g.MeasureString(footer, new Font("Cairo", 8F));
+            g.DrawString(footer, new Font("Cairo", 8F), grayBrush, 
+                (e.PageBounds.Width - footerSize.Width) / 2, yPos);
+            
+            // تنظيف الموارد
+            titleFont.Dispose();
+            headerFont.Dispose();
+            labelFont.Dispose();
+            valueFont.Dispose();
+            tableHeaderFont.Dispose();
+            tableCellFont.Dispose();
+            blueBrush.Dispose();
+            grayBrush.Dispose();
+            greenBrush.Dispose();
+            redBrush.Dispose();
+            altRowBrush.Dispose();
+            borderPen.Dispose();
+            headerBrush.Dispose();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"خطأ في رسم الصفحة: {ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+    
+    private void DrawLabelValue(Graphics g, string label, string value, 
+        Font labelFont, Font valueFont, Brush brush, 
+        float margin, ref float yPos, float pageWidth)
+    {
+        SizeF labelSize = g.MeasureString(label, labelFont);
+        float rightAlign = margin + pageWidth;
+        
+        // رسم التسمية
+        g.DrawString(label, labelFont, brush, rightAlign - labelSize.Width, yPos);
+        
+        // رسم القيمة
+        float valueX = rightAlign - labelSize.Width - 20;
+        SizeF valueSize = g.MeasureString(value, valueFont);
+        g.DrawString(value, valueFont, brush, valueX - valueSize.Width, yPos);
+        
+        yPos += Math.Max(labelSize.Height, valueSize.Height) + 5;
     }
     
     private string GetStatusArabic(PackageStatus status)

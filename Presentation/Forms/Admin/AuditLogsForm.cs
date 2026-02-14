@@ -16,7 +16,10 @@ public partial class AuditLogsForm : Form
     private Button btnClear = null!;
     private Button btnExport = null!;
     private Button btnRefresh = null!;
+    private Button btnDeleteSelected = null!;
+    private Button btnDeleteAll = null!;
     private Label lblTotalRecords = null!;
+    private ContextMenuStrip contextMenu = null!;
 
     public AuditLogsForm(IAuditService auditService)
     {
@@ -78,12 +81,17 @@ public partial class AuditLogsForm : Form
             Font = new Font("Cairo", 9F)
         };
 
+        dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "AuditLogId", HeaderText = "ID", Width = 60, Visible = false });
         dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "Timestamp", HeaderText = "التاريخ والوقت", Width = 150 });
         dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "UserFullName", HeaderText = "المستخدم", Width = 150 });
         dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "Action", HeaderText = "الإجراء", Width = 100 });
         dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "EntityType", HeaderText = "نوع العنصر", Width = 120 });
         dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "EntityName", HeaderText = "اسم العنصر", Width = 200 });
         dgvLogs.Columns.Add(new DataGridViewTextBoxColumn { Name = "Description", HeaderText = "الوصف", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+
+        // Context Menu (Right Click)
+        CreateContextMenu();
+        dgvLogs.ContextMenuStrip = contextMenu;
 
         mainLayout.Controls.Add(dgvLogs, 0, 1);
 
@@ -179,9 +187,15 @@ public partial class AuditLogsForm : Form
         btnExport = CreateButton("📊 تصدير", new Point(150, 47), ColorScheme.Info);
         btnExport.Click += BtnExport_Click;
 
+        btnDeleteSelected = CreateButton("🗑️ حذف المحدد", new Point(30, 47), Color.FromArgb(211, 47, 47));
+        btnDeleteSelected.Click += async (s, e) => await DeleteSelectedLogAsync();
+
+        btnDeleteAll = CreateButton("⚠️ حذف الكل", new Point(1200, 85), Color.FromArgb(183, 28, 28));
+        btnDeleteAll.Click += async (s, e) => await DeleteAllLogsAsync();
+
         panel.Controls.AddRange(new Control[] { 
             lblAction, cmbAction, lblSearch, txtSearch, 
-            btnFilter, btnClear, btnRefresh, btnExport 
+            btnFilter, btnClear, btnRefresh, btnExport, btnDeleteSelected, btnDeleteAll
         });
 
         return panel;
@@ -239,6 +253,7 @@ public partial class AuditLogsForm : Form
             foreach (var log in logs)
             {
                 dgvLogs.Rows.Add(
+                    log.AuditLogId,
                     log.Timestamp.ToString("dd/MM/yyyy hh:mm tt"),
                     log.UserFullName,
                     GetActionText(log.Action),
@@ -304,4 +319,203 @@ public partial class AuditLogsForm : Form
         "Invoice" => "فاتورة",
         _ => entityType
     };
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CONTEXT MENU (RIGHT CLICK)
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private void CreateContextMenu()
+    {
+        contextMenu = new ContextMenuStrip
+        {
+            Font = new Font("Cairo", 10F),
+            RightToLeft = RightToLeft.Yes
+        };
+
+        var deleteItem = new ToolStripMenuItem
+        {
+            Text = "🗑️ حذف هذا السجل",
+            Font = new Font("Cairo", 10F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(211, 47, 47)
+        };
+        deleteItem.Click += async (s, e) => await DeleteSelectedLogAsync();
+
+        var viewDetailsItem = new ToolStripMenuItem
+        {
+            Text = "👁️ عرض التفاصيل",
+            Font = new Font("Cairo", 10F)
+        };
+        viewDetailsItem.Click += ViewLogDetails;
+
+        contextMenu.Items.Add(viewDetailsItem);
+        contextMenu.Items.Add(new ToolStripSeparator());
+        contextMenu.Items.Add(deleteItem);
+    }
+
+    private void ViewLogDetails(object? sender, EventArgs e)
+    {
+        if (dgvLogs.SelectedRows.Count == 0)
+            return;
+
+        var row = dgvLogs.SelectedRows[0];
+        string details = $"التاريخ والوقت: {row.Cells["Timestamp"].Value}\n" +
+                        $"المستخدم: {row.Cells["UserFullName"].Value}\n" +
+                        $"الإجراء: {row.Cells["Action"].Value}\n" +
+                        $"نوع العنصر: {row.Cells["EntityType"].Value}\n" +
+                        $"اسم العنصر: {row.Cells["EntityName"].Value}\n" +
+                        $"\nالوصف:\n{row.Cells["Description"].Value}";
+
+        MessageBox.Show(details, "تفاصيل السجل", 
+            MessageBoxButtons.OK, MessageBoxIcon.Information,
+            MessageBoxDefaultButton.Button1,
+            MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // DELETE OPERATIONS
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private async Task DeleteSelectedLogAsync()
+    {
+        try
+        {
+            if (dgvLogs.SelectedRows.Count == 0)
+            {
+                MessageBox.Show("يرجى اختيار سجل لحذفه", "تنبيه",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                return;
+            }
+
+            var row = dgvLogs.SelectedRows[0];
+            string logInfo = $"{row.Cells["Timestamp"].Value} - {row.Cells["UserFullName"].Value} - {row.Cells["Action"].Value}";
+
+            var result = MessageBox.Show(
+                $"هل أنت متأكد من حذف هذا السجل؟\n\n{logInfo}\n\n⚠️ تحذير: لا يمكن التراجع عن هذا الإجراء!",
+                "تأكيد الحذف",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+
+            if (result != DialogResult.Yes)
+                return;
+
+            int logId = Convert.ToInt32(row.Cells["AuditLogId"].Value);
+
+            this.Cursor = Cursors.WaitCursor;
+            bool success = await _auditService.DeleteLogAsync(logId);
+
+            if (success)
+            {
+                MessageBox.Show("تم حذف السجل بنجاح!", "نجح",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information,
+                    MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+
+                await LoadLogsAsync();
+            }
+            else
+            {
+                MessageBox.Show("فشل حذف السجل!", "خطأ",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error,
+                    MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"خطأ في حذف السجل:\n{ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error,
+                MessageBoxDefaultButton.Button1,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+        }
+        finally
+        {
+            this.Cursor = Cursors.Default;
+        }
+    }
+
+    private async Task DeleteAllLogsAsync()
+    {
+        try
+        {
+            int totalRecords = dgvLogs.Rows.Count;
+
+            if (totalRecords == 0)
+            {
+                MessageBox.Show("لا توجد سجلات لحذفها", "تنبيه",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                return;
+            }
+
+            var result = MessageBox.Show(
+                $"⚠️ تحذير خطير! ⚠️\n\nأنت على وشك حذف جميع السجلات ({totalRecords} سجل)\n\n" +
+                "هذا الإجراء سيحذف:\n" +
+                "• جميع سجلات العمليات\n" +
+                "• سجلات تسجيل الدخول\n" +
+                "• جميع التغييرات المسجلة\n\n" +
+                "⛔ لا يمكن التراجع عن هذا الإجراء!\n\n" +
+                "هل أنت متأكد تماماً؟",
+                "⚠️ تأكيد حذف جميع السجلات ⚠️",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Stop,
+                MessageBoxDefaultButton.Button2,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+
+            if (result != DialogResult.Yes)
+                return;
+
+            // Second confirmation
+            var result2 = MessageBox.Show(
+                "⚠️ تأكيد نهائي! ⚠️\n\nهل أنت متأكد 100% من حذف جميع السجلات؟\n\nهذا لا يمكن التراجع عنه!",
+                "تأكيد نهائي",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+
+            if (result2 != DialogResult.Yes)
+                return;
+
+            this.Cursor = Cursors.WaitCursor;
+            btnDeleteAll.Enabled = false;
+            btnDeleteAll.Text = "جاري الحذف...";
+
+            bool success = await _auditService.DeleteAllLogsAsync();
+
+            if (success)
+            {
+                MessageBox.Show($"تم حذف جميع السجلات ({totalRecords} سجل) بنجاح!", "نجح",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information,
+                    MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+
+                await LoadLogsAsync();
+            }
+            else
+            {
+                MessageBox.Show("فشل حذف السجلات!", "خطأ",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error,
+                    MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"خطأ في حذف السجلات:\n{ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error,
+                MessageBoxDefaultButton.Button1,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+        }
+        finally
+        {
+            this.Cursor = Cursors.Default;
+            btnDeleteAll.Enabled = true;
+            btnDeleteAll.Text = "⚠️ حذف الكل";
+        }
+    }
 }

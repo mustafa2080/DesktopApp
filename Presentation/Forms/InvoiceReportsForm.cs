@@ -58,12 +58,12 @@ public partial class InvoiceReportsForm : Form
     
     private void InitializeComponent()
     {
-        this.Text = "📊 تقارير الفواتير الاحترافية";
-        this.Size = new Size(1600, 950);
+        this.Text = "📊 تقارير الفواتير";
+        this.Size = new Size(1650, 980);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.RightToLeft = RightToLeft.Yes;
         this.RightToLeftLayout = true;
-        this.BackColor = ColorScheme.Background;
+        this.BackColor = Color.FromArgb(245, 247, 250);
         this.Font = new Font("Cairo", 10F);
         this.WindowState = FormWindowState.Maximized;
     }
@@ -76,48 +76,48 @@ public partial class InvoiceReportsForm : Form
         Panel headerPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 180,
+            Height = 160,
             BackColor = Color.White,
-            Padding = new Padding(30, 20, 30, 20)
+            Padding = new Padding(25, 15, 25, 15)
         };
         
         // Title with icon
         Label titleLabel = new Label
         {
-            Text = "📊 تقارير الفواتير الاحترافية",
-            Font = new Font("Cairo", 18F, FontStyle.Bold),
+            Text = "📊 تقارير الفواتير",
+            Font = new Font("Cairo", 16F, FontStyle.Bold),
             ForeColor = ColorScheme.Primary,
             AutoSize = true,
-            Location = new Point(30, 20)
+            Location = new Point(25, 15)
         };
         headerPanel.Controls.Add(titleLabel);
         
         Label subtitleLabel = new Label
         {
             Text = "تحليل شامل ومفصل للمبيعات والمشتريات",
-            Font = new Font("Cairo", 10F),
+            Font = new Font("Cairo", 9.5F),
             ForeColor = Color.Gray,
             AutoSize = true,
-            Location = new Point(30, 55)
+            Location = new Point(25, 48)
         };
         headerPanel.Controls.Add(subtitleLabel);
         
         // Date Range Section
-        int yPos = 95;
+        int yPos = 85;
         Label startLabel = new Label
         {
-            Text = "📅 من تاريخ:",
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
+            Text = "📅 من:",
+            Font = new Font("Cairo", 9.5F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(30, yPos)
+            Location = new Point(25, yPos)
         };
         headerPanel.Controls.Add(startLabel);
         
         _startDatePicker = new DateTimePicker
         {
-            Font = new Font("Cairo", 10F),
-            Size = new Size(180, 35),
-            Location = new Point(130, yPos - 3),
+            Font = new Font("Cairo", 9.5F),
+            Size = new Size(170, 32),
+            Location = new Point(100, yPos - 2),
             Format = DateTimePickerFormat.Short
         };
         _startDatePicker.Value = DateTime.Now.AddMonths(-1);
@@ -125,44 +125,44 @@ public partial class InvoiceReportsForm : Form
         
         Label endLabel = new Label
         {
-            Text = "📅 إلى تاريخ:",
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
+            Text = "📅 إلى:",
+            Font = new Font("Cairo", 9.5F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(330, yPos)
+            Location = new Point(290, yPos)
         };
         headerPanel.Controls.Add(endLabel);
         
         _endDatePicker = new DateTimePicker
         {
-            Font = new Font("Cairo", 10F),
-            Size = new Size(180, 35),
-            Location = new Point(430, yPos - 3),
+            Font = new Font("Cairo", 9.5F),
+            Size = new Size(170, 32),
+            Location = new Point(355, yPos - 2),
             Format = DateTimePickerFormat.Short
         };
         headerPanel.Controls.Add(_endDatePicker);
         
         // Action Buttons
-        _generateButton = CreateStyledButton("📊 إنشاء التقرير", ColorScheme.Primary, new Point(630, yPos - 3));
+        _generateButton = CreateStyledButton("📊 إنشاء التقرير", ColorScheme.Primary, new Point(545, yPos - 2));
         _generateButton.Click += GenerateReport_Click;
         headerPanel.Controls.Add(_generateButton);
         
-        _refreshButton = CreateStyledButton("🔄 تحديث", Color.FromArgb(76, 175, 80), new Point(820, yPos - 3));
+        _refreshButton = CreateStyledButton("🔄 تحديث", Color.FromArgb(76, 175, 80), new Point(725, yPos - 2));
         _refreshButton.Click += async (s, e) => 
         {
-            _lastRefreshTime = DateTime.MinValue; // فرض التحديث
+            _lastRefreshTime = DateTime.MinValue;
             await LoadInitialDataAsync();
         };
         headerPanel.Controls.Add(_refreshButton);
         
-        _exportExcelButton = CreateStyledButton("📥 Excel", Color.FromArgb(33, 150, 83), new Point(1010, yPos - 3));
+        _exportExcelButton = CreateStyledButton("📥 Excel", Color.FromArgb(33, 150, 83), new Point(905, yPos - 2));
         _exportExcelButton.Click += ExportToExcel_Click;
         headerPanel.Controls.Add(_exportExcelButton);
         
-        _exportPdfButton = CreateStyledButton("📄 PDF", Color.FromArgb(211, 47, 47), new Point(1200, yPos - 3));
+        _exportPdfButton = CreateStyledButton("📄 PDF", Color.FromArgb(211, 47, 47), new Point(1085, yPos - 2));
         _exportPdfButton.Click += ExportToPdf_Click;
         headerPanel.Controls.Add(_exportPdfButton);
         
-        _printButton = CreateStyledButton("🖨️ طباعة", ColorScheme.Warning, new Point(1390, yPos - 3));
+        _printButton = CreateStyledButton("🖨️ طباعة", ColorScheme.Warning, new Point(1265, yPos - 2));
         _printButton.Click += PrintReport_Click;
         headerPanel.Controls.Add(_printButton);
         
@@ -174,26 +174,26 @@ public partial class InvoiceReportsForm : Form
         Panel filterPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 80,
-            BackColor = Color.FromArgb(245, 247, 250),
-            Padding = new Padding(30, 15, 30, 15)
+            Height = 70,
+            BackColor = Color.FromArgb(248, 249, 250),
+            Padding = new Padding(25, 12, 25, 12)
         };
         
         Label searchLabel = new Label
         {
             Text = "🔍",
-            Font = new Font("Segoe UI Emoji", 14F),
+            Font = new Font("Segoe UI Emoji", 12F),
             AutoSize = true,
-            Location = new Point(30, 28)
+            Location = new Point(25, 23)
         };
         filterPanel.Controls.Add(searchLabel);
         
         _searchBox = new TextBox
         {
-            Font = new Font("Cairo", 10F),
-            Size = new Size(250, 35),
-            Location = new Point(65, 25),
-            PlaceholderText = "بحث برقم الفاتورة، العميل، أو المورد..."
+            Font = new Font("Cairo", 9.5F),
+            Size = new Size(240, 32),
+            Location = new Point(55, 20),
+            PlaceholderText = "بحث برقم الفاتورة أو العميل..."
         };
         _searchBox.TextChanged += (s, e) => ApplyFilters();
         filterPanel.Controls.Add(_searchBox);
@@ -203,15 +203,15 @@ public partial class InvoiceReportsForm : Form
             Text = "الحالة:",
             Font = new Font("Cairo", 9F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(335, 30)
+            Location = new Point(310, 25)
         };
         filterPanel.Controls.Add(statusLabel);
         
         _statusFilterCombo = new ComboBox
         {
             Font = new Font("Cairo", 9F),
-            Size = new Size(150, 30),
-            Location = new Point(395, 27),
+            Size = new Size(140, 28),
+            Location = new Point(365, 22),
             DropDownStyle = ComboBoxStyle.DropDownList
         };
         _statusFilterCombo.Items.AddRange(new[] { "الكل", "مدفوعة", "مدفوعة جزئياً", "غير مدفوعة" });
@@ -224,15 +224,15 @@ public partial class InvoiceReportsForm : Form
             Text = "العميل:",
             Font = new Font("Cairo", 9F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(565, 30)
+            Location = new Point(520, 25)
         };
         filterPanel.Controls.Add(customerLabel);
         
         _customerFilterCombo = new ComboBox
         {
             Font = new Font("Cairo", 9F),
-            Size = new Size(200, 30),
-            Location = new Point(625, 27),
+            Size = new Size(180, 28),
+            Location = new Point(575, 22),
             DropDownStyle = ComboBoxStyle.DropDownList
         };
         _customerFilterCombo.Items.Add("الكل");
@@ -245,15 +245,15 @@ public partial class InvoiceReportsForm : Form
             Text = "المورد:",
             Font = new Font("Cairo", 9F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(845, 30)
+            Location = new Point(770, 25)
         };
         filterPanel.Controls.Add(supplierLabel);
         
         _supplierFilterCombo = new ComboBox
         {
             Font = new Font("Cairo", 9F),
-            Size = new Size(200, 30),
-            Location = new Point(905, 27),
+            Size = new Size(180, 28),
+            Location = new Point(825, 22),
             DropDownStyle = ComboBoxStyle.DropDownList
         };
         _supplierFilterCombo.Items.Add("الكل");
@@ -261,7 +261,7 @@ public partial class InvoiceReportsForm : Form
         _supplierFilterCombo.SelectedIndexChanged += (s, e) => ApplyFilters();
         filterPanel.Controls.Add(_supplierFilterCombo);
         
-        _clearFiltersButton = CreateSmallButton("✖ مسح الفلاتر", Color.FromArgb(158, 158, 158), new Point(1125, 25));
+        _clearFiltersButton = CreateSmallButton("✖ مسح", Color.FromArgb(158, 158, 158), new Point(1020, 20));
         _clearFiltersButton.Click += (s, e) => ClearFilters();
         filterPanel.Controls.Add(_clearFiltersButton);
         
@@ -273,8 +273,8 @@ public partial class InvoiceReportsForm : Form
         _tabControl = new TabControl
         {
             Dock = DockStyle.Fill,
-            Font = new Font("Cairo", 11F, FontStyle.Bold),
-            Padding = new Point(20, 5)
+            Font = new Font("Cairo", 10.5F, FontStyle.Bold),
+            Padding = new Point(15, 6)
         };
         
         // Tab 1: Sales Report
@@ -305,22 +305,22 @@ public partial class InvoiceReportsForm : Form
         Panel container = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = ColorScheme.Background,
-            Padding = new Padding(20)
+            BackColor = Color.FromArgb(245, 247, 250),
+            Padding = new Padding(15)
         };
         
-        // Data Grid - أضفه الأول
+        // Data Grid
         _salesReportGrid = CreateProfessionalGrid();
         _salesReportGrid.Dock = DockStyle.Fill;
         _salesReportGrid.CellDoubleClick += SalesGrid_CellDoubleClick;
         container.Controls.Add(_salesReportGrid);
         
-        // Summary Cards Panel - أضفه الثاني عشان يظهر فوق
+        // Summary Cards Panel
         _salesSummaryPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 150,
-            BackColor = ColorScheme.Background
+            Height = 130,
+            BackColor = Color.FromArgb(245, 247, 250)
         };
         container.Controls.Add(_salesSummaryPanel);
         
@@ -332,22 +332,22 @@ public partial class InvoiceReportsForm : Form
         Panel container = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = ColorScheme.Background,
-            Padding = new Padding(20)
+            BackColor = Color.FromArgb(245, 247, 250),
+            Padding = new Padding(15)
         };
         
-        // Data Grid - أضفه الأول
+        // Data Grid
         _purchaseReportGrid = CreateProfessionalGrid();
         _purchaseReportGrid.Dock = DockStyle.Fill;
         _purchaseReportGrid.CellDoubleClick += PurchaseGrid_CellDoubleClick;
         container.Controls.Add(_purchaseReportGrid);
         
-        // Summary Cards Panel - أضفه الثاني عشان يظهر فوق
+        // Summary Cards Panel
         _purchaseSummaryPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 150,
-            BackColor = ColorScheme.Background
+            Height = 130,
+            BackColor = Color.FromArgb(245, 247, 250)
         };
         container.Controls.Add(_purchaseSummaryPanel);
         
@@ -383,7 +383,7 @@ public partial class InvoiceReportsForm : Form
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
             RowHeadersVisible = false,
-            Font = new Font("Cairo", 11F),
+            Font = new Font("Cairo", 10F),
             EnableHeadersVisualStyles = false,
             MultiSelect = false,
             AllowUserToResizeColumns = true,
@@ -395,26 +395,26 @@ public partial class InvoiceReportsForm : Form
         {
             BackColor = ColorScheme.Primary,
             ForeColor = Color.White,
-            Font = new Font("Cairo", 12F, FontStyle.Bold),
+            Font = new Font("Cairo", 10.5F, FontStyle.Bold),
             Alignment = DataGridViewContentAlignment.MiddleCenter,
-            Padding = new Padding(12),
+            Padding = new Padding(10),
             WrapMode = DataGridViewTriState.True
         };
         
         // Cell style
         grid.DefaultCellStyle = new DataGridViewCellStyle
         {
-            Font = new Font("Cairo", 11F),
-            Padding = new Padding(10, 8, 10, 8),
-            SelectionBackColor = Color.FromArgb(33, 150, 243),
-            SelectionForeColor = Color.White,
+            Font = new Font("Cairo", 10F),
+            Padding = new Padding(8, 6, 8, 6),
+            SelectionBackColor = Color.FromArgb(230, 240, 255),
+            SelectionForeColor = ColorScheme.Primary,
             ForeColor = Color.FromArgb(33, 33, 33),
             WrapMode = DataGridViewTriState.False,
             BackColor = Color.White
         };
         
-        grid.ColumnHeadersHeight = 55;
-        grid.RowTemplate.Height = 50;
+        grid.ColumnHeadersHeight = 48;
+        grid.RowTemplate.Height = 44;
         grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 249, 250);
         
         // Hover effect
@@ -431,7 +431,7 @@ public partial class InvoiceReportsForm : Form
                 if (e.RowIndex % 2 == 0)
                     grid.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.White;
                 else
-                    grid.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.FromArgb(250, 250, 250);
+                    grid.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.FromArgb(248, 249, 250);
             }
         };
         
@@ -447,8 +447,8 @@ public partial class InvoiceReportsForm : Form
         Button btn = new Button
         {
             Text = text,
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
-            Size = new Size(170, 40),
+            Font = new Font("Cairo", 9.5F, FontStyle.Bold),
+            Size = new Size(160, 36),
             Location = location,
             BackColor = bgColor,
             ForeColor = Color.White,
@@ -467,7 +467,7 @@ public partial class InvoiceReportsForm : Form
         {
             Text = text,
             Font = new Font("Cairo", 9F, FontStyle.Bold),
-            Size = new Size(140, 30),
+            Size = new Size(110, 28),
             Location = location,
             BackColor = bgColor,
             ForeColor = Color.White,
@@ -850,8 +850,8 @@ public partial class InvoiceReportsForm : Form
     {
         _salesSummaryPanel.Controls.Clear();
         
-        int cardWidth = 280;
-        int cardSpacing = 20;
+        int cardWidth = 260;
+        int cardSpacing = 15;
         int x = 0;
         
         // Card 1: Total Invoices
@@ -861,26 +861,26 @@ public partial class InvoiceReportsForm : Form
         
         // Card 2: Total Amount
         CreateSummaryCard(_salesSummaryPanel, "إجمالي المبيعات", 
-            invoices.Sum(i => i.TotalAmount).ToString("N2") + " جنيه",
+            invoices.Sum(i => i.TotalAmount).ToString("N2") + " ج.م",
             "💵", Color.FromArgb(33, 150, 83), x, 0, cardWidth);
         x += cardWidth + cardSpacing;
         
         // Card 3: Paid Amount
         CreateSummaryCard(_salesSummaryPanel, "المحصل", 
-            invoices.Sum(i => i.PaidAmount).ToString("N2") + " جنيه",
+            invoices.Sum(i => i.PaidAmount).ToString("N2") + " ج.م",
             "✅", ColorScheme.Success, x, 0, cardWidth);
         x += cardWidth + cardSpacing;
         
         // Card 4: Remaining Amount
         CreateSummaryCard(_salesSummaryPanel, "المتبقي", 
-            invoices.Sum(i => i.RemainingAmount).ToString("N2") + " جنيه",
+            invoices.Sum(i => i.RemainingAmount).ToString("N2") + " ج.م",
             "⏳", ColorScheme.Error, x, 0, cardWidth);
         x += cardWidth + cardSpacing;
         
         // Card 5: Average Invoice
         decimal avgInvoice = invoices.Any() ? invoices.Average(i => i.TotalAmount) : 0;
         CreateSummaryCard(_salesSummaryPanel, "متوسط الفاتورة", 
-            avgInvoice.ToString("N2") + " جنيه",
+            avgInvoice.ToString("N2") + " ج.م",
             "📊", Color.FromArgb(156, 39, 176), x, 0, cardWidth);
     }
     
@@ -890,7 +890,7 @@ public partial class InvoiceReportsForm : Form
         Panel card = new Panel
         {
             Location = new Point(x, y),
-            Size = new Size(width, 130),
+            Size = new Size(width, 110),
             BackColor = Color.White,
             BorderStyle = BorderStyle.FixedSingle
         };
@@ -899,7 +899,7 @@ public partial class InvoiceReportsForm : Form
         Panel topBar = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 5,
+            Height = 4,
             BackColor = color
         };
         card.Controls.Add(topBar);
@@ -908,12 +908,12 @@ public partial class InvoiceReportsForm : Form
         Label iconLabel = new Label
         {
             Text = icon,
-            Font = new Font("Segoe UI Emoji", 32F),
+            Font = new Font("Segoe UI Emoji", 28F),
             ForeColor = color,
             AutoSize = false,
-            Size = new Size(70, 70),
+            Size = new Size(60, 60),
             TextAlign = ContentAlignment.MiddleCenter,
-            Location = new Point(10, 25)
+            Location = new Point(8, 20)
         };
         card.Controls.Add(iconLabel);
         
@@ -921,12 +921,12 @@ public partial class InvoiceReportsForm : Form
         Label titleLabel = new Label
         {
             Text = title,
-            Font = new Font("Cairo", 10F),
+            Font = new Font("Cairo", 9F),
             ForeColor = Color.Gray,
             AutoSize = false,
-            Size = new Size(190, 25),
+            Size = new Size(width - 75, 22),
             TextAlign = ContentAlignment.MiddleRight,
-            Location = new Point(85, 30)
+            Location = new Point(73, 25)
         };
         card.Controls.Add(titleLabel);
         
@@ -934,12 +934,12 @@ public partial class InvoiceReportsForm : Form
         Label valueLabel = new Label
         {
             Text = value,
-            Font = new Font("Cairo", 13F, FontStyle.Bold),
+            Font = new Font("Cairo", 12F, FontStyle.Bold),
             ForeColor = color,
             AutoSize = false,
-            Size = new Size(190, 40),
+            Size = new Size(width - 75, 35),
             TextAlign = ContentAlignment.MiddleRight,
-            Location = new Point(85, 60)
+            Location = new Point(73, 52)
         };
         card.Controls.Add(valueLabel);
         

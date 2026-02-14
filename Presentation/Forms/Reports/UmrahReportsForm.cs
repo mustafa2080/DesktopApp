@@ -53,12 +53,12 @@ public partial class UmrahReportsForm : Form
     
     private void SetupForm()
     {
-        this.Text = "📊 تقارير العمرة الاحترافية";
-        this.Size = new Size(1600, 950);
+        this.Text = "📊 تقارير العمرة";
+        this.Size = new Size(1650, 980);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.RightToLeft = RightToLeft.Yes;
         this.RightToLeftLayout = true;
-        this.BackColor = ColorScheme.Background;
+        this.BackColor = Color.FromArgb(245, 247, 250);
         this.Font = new Font("Cairo", 10F);
         this.WindowState = FormWindowState.Maximized;
     }
@@ -71,48 +71,48 @@ public partial class UmrahReportsForm : Form
         Panel headerPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 180,
+            Height = 160,
             BackColor = Color.White,
-            Padding = new Padding(30, 20, 30, 20)
+            Padding = new Padding(25, 15, 25, 15)
         };
         
         // Title with icon
         Label titleLabel = new Label
         {
-            Text = "🕌 تقارير حزم العمرة الاحترافية",
-            Font = new Font("Cairo", 18F, FontStyle.Bold),
+            Text = "🕌 تقارير العمرة",
+            Font = new Font("Cairo", 16F, FontStyle.Bold),
             ForeColor = ColorScheme.Primary,
             AutoSize = true,
-            Location = new Point(30, 20)
+            Location = new Point(25, 15)
         };
         headerPanel.Controls.Add(titleLabel);
         
         Label subtitleLabel = new Label
         {
             Text = "تحليل شامل للحزم والربحية والأداء المالي",
-            Font = new Font("Cairo", 10F),
+            Font = new Font("Cairo", 9.5F),
             ForeColor = Color.Gray,
             AutoSize = true,
-            Location = new Point(30, 55)
+            Location = new Point(25, 48)
         };
         headerPanel.Controls.Add(subtitleLabel);
         
         // Date Range Section
-        int yPos = 95;
+        int yPos = 85;
         Label startLabel = new Label
         {
-            Text = "📅 من تاريخ:",
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
+            Text = "📅 من:",
+            Font = new Font("Cairo", 9.5F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(30, yPos)
+            Location = new Point(25, yPos)
         };
         headerPanel.Controls.Add(startLabel);
         
         _startDatePicker = new DateTimePicker
         {
-            Font = new Font("Cairo", 10F),
-            Size = new Size(180, 35),
-            Location = new Point(130, yPos - 3),
+            Font = new Font("Cairo", 9.5F),
+            Size = new Size(170, 32),
+            Location = new Point(100, yPos - 2),
             Format = DateTimePickerFormat.Short
         };
         _startDatePicker.Value = DateTime.Now.AddMonths(-1);
@@ -120,18 +120,18 @@ public partial class UmrahReportsForm : Form
         
         Label endLabel = new Label
         {
-            Text = "📅 إلى تاريخ:",
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
+            Text = "📅 إلى:",
+            Font = new Font("Cairo", 9.5F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(330, yPos)
+            Location = new Point(290, yPos)
         };
         headerPanel.Controls.Add(endLabel);
         
         _endDatePicker = new DateTimePicker
         {
-            Font = new Font("Cairo", 10F),
-            Size = new Size(180, 35),
-            Location = new Point(430, yPos - 3),
+            Font = new Font("Cairo", 9.5F),
+            Size = new Size(170, 32),
+            Location = new Point(355, yPos - 2),
             Format = DateTimePickerFormat.Short
         };
         headerPanel.Controls.Add(_endDatePicker);
@@ -139,10 +139,10 @@ public partial class UmrahReportsForm : Form
         // CheckBox لإظهار كل الحزم
         CheckBox showAllCheckBox = new CheckBox
         {
-            Text = "إظهار كل الحزم (تجاهل التاريخ)",
-            Font = new Font("Cairo", 9F),
+            Text = "إظهار كل الحزم",
+            Font = new Font("Cairo", 8.5F),
             AutoSize = true,
-            Location = new Point(630, yPos + 40),
+            Location = new Point(545, yPos + 35),
             Checked = false
         };
         showAllCheckBox.CheckedChanged += (s, e) =>
@@ -153,23 +153,23 @@ public partial class UmrahReportsForm : Form
         headerPanel.Controls.Add(showAllCheckBox);
         
         // Action Buttons
-        _generateButton = CreateStyledButton("📊 إنشاء التقرير", ColorScheme.Primary, new Point(630, yPos - 3));
+        _generateButton = CreateStyledButton("📊 إنشاء التقرير", ColorScheme.Primary, new Point(545, yPos - 2));
         _generateButton.Click += (s, e) => GenerateReport_Click(s, e, showAllCheckBox.Checked);
         headerPanel.Controls.Add(_generateButton);
         
-        _refreshButton = CreateStyledButton("🔄 تحديث", Color.FromArgb(76, 175, 80), new Point(820, yPos - 3));
+        _refreshButton = CreateStyledButton("🔄 تحديث", Color.FromArgb(76, 175, 80), new Point(725, yPos - 2));
         _refreshButton.Click += async (s, e) => await LoadInitialDataAsync();
         headerPanel.Controls.Add(_refreshButton);
         
-        _exportExcelButton = CreateStyledButton("📥 Excel", Color.FromArgb(33, 150, 83), new Point(1010, yPos - 3));
+        _exportExcelButton = CreateStyledButton("📥 Excel", Color.FromArgb(33, 150, 83), new Point(905, yPos - 2));
         _exportExcelButton.Click += ExportToExcel_Click;
         headerPanel.Controls.Add(_exportExcelButton);
         
-        _exportPdfButton = CreateStyledButton("📄 PDF", Color.FromArgb(211, 47, 47), new Point(1200, yPos - 3));
+        _exportPdfButton = CreateStyledButton("📄 PDF", Color.FromArgb(211, 47, 47), new Point(1085, yPos - 2));
         _exportPdfButton.Click += ExportToPdf_Click;
         headerPanel.Controls.Add(_exportPdfButton);
         
-        _printButton = CreateStyledButton("🖨️ طباعة", ColorScheme.Warning, new Point(1390, yPos - 3));
+        _printButton = CreateStyledButton("🖨️ طباعة", ColorScheme.Warning, new Point(1265, yPos - 2));
         _printButton.Click += PrintReport_Click;
         headerPanel.Controls.Add(_printButton);
         
@@ -181,26 +181,26 @@ public partial class UmrahReportsForm : Form
         Panel filterPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 80,
-            BackColor = Color.FromArgb(245, 247, 250),
-            Padding = new Padding(30, 15, 30, 15)
+            Height = 70,
+            BackColor = Color.FromArgb(248, 249, 250),
+            Padding = new Padding(25, 12, 25, 12)
         };
         
         Label searchLabel = new Label
         {
             Text = "🔍",
-            Font = new Font("Segoe UI Emoji", 14F),
+            Font = new Font("Segoe UI Emoji", 12F),
             AutoSize = true,
-            Location = new Point(30, 28)
+            Location = new Point(25, 23)
         };
         filterPanel.Controls.Add(searchLabel);
         
         _searchBox = new TextBox
         {
-            Font = new Font("Cairo", 10F),
-            Size = new Size(250, 35),
-            Location = new Point(65, 25),
-            PlaceholderText = "بحث برقم الحزمة، المعتمر، أو الوسيط..."
+            Font = new Font("Cairo", 9.5F),
+            Size = new Size(240, 32),
+            Location = new Point(55, 20),
+            PlaceholderText = "بحث برقم الحزمة أو المعتمر..."
         };
         
         // Auto-select all text when clicking on search box
@@ -219,15 +219,15 @@ public partial class UmrahReportsForm : Form
             Text = "الحالة:",
             Font = new Font("Cairo", 9F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(335, 30)
+            Location = new Point(310, 25)
         };
         filterPanel.Controls.Add(statusLabel);
         
         _statusFilterCombo = new ComboBox
         {
             Font = new Font("Cairo", 9F),
-            Size = new Size(150, 35),
-            Location = new Point(395, 25),
+            Size = new Size(140, 28),
+            Location = new Point(365, 22),
             DropDownStyle = ComboBoxStyle.DropDownList
         };
         _statusFilterCombo.Items.AddRange(new object[] { "الكل", "مسودة", "مؤكد", "قيد التنفيذ", "مكتمل", "ملغي" });
@@ -240,15 +240,15 @@ public partial class UmrahReportsForm : Form
             Text = "نوع الغرفة:",
             Font = new Font("Cairo", 9F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(565, 30)
+            Location = new Point(520, 25)
         };
         filterPanel.Controls.Add(roomLabel);
         
         _roomTypeFilterCombo = new ComboBox
         {
             Font = new Font("Cairo", 9F),
-            Size = new Size(150, 35),
-            Location = new Point(660, 25),
+            Size = new Size(140, 28),
+            Location = new Point(610, 22),
             DropDownStyle = ComboBoxStyle.DropDownList
         };
         _roomTypeFilterCombo.Items.AddRange(new object[] { "الكل", "فردي", "ثنائي", "ثلاثي", "رباعي" });
@@ -256,8 +256,8 @@ public partial class UmrahReportsForm : Form
         _roomTypeFilterCombo.SelectedIndexChanged += (s, e) => ApplyFilters();
         filterPanel.Controls.Add(_roomTypeFilterCombo);
         
-        _clearFiltersButton = CreateStyledButton("🗑️ مسح الفلاتر", Color.Gray, new Point(830, 25));
-        _clearFiltersButton.Size = new Size(140, 35);
+        _clearFiltersButton = CreateStyledButton("🗑️ مسح", Color.Gray, new Point(770, 20));
+        _clearFiltersButton.Size = new Size(110, 28);
         _clearFiltersButton.Click += ClearFilters_Click;
         filterPanel.Controls.Add(_clearFiltersButton);
         
@@ -269,8 +269,8 @@ public partial class UmrahReportsForm : Form
         _tabControl = new TabControl
         {
             Dock = DockStyle.Fill,
-            Font = new Font("Cairo", 11F, FontStyle.Bold),
-            Padding = new Point(15, 8)
+            Font = new Font("Cairo", 10.5F, FontStyle.Bold),
+            Padding = new Point(15, 6)
         };
         
         // Tab 1: تقرير الحزم
@@ -300,16 +300,16 @@ public partial class UmrahReportsForm : Form
     // ═══════════════════════════════════════════
     private void InitializePackagesTab(TabPage tab)
     {
-        tab.BackColor = ColorScheme.Background;
-        tab.Padding = new Padding(20);
+        tab.BackColor = Color.FromArgb(245, 247, 250);
+        tab.Padding = new Padding(15);
         
         // Summary Panel
         _summaryPanel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 140,
+            Height = 120,
             BackColor = Color.White,
-            Padding = new Padding(20)
+            Padding = new Padding(15)
         };
         
         // Summary Cards Container
@@ -356,7 +356,7 @@ public partial class UmrahReportsForm : Form
             {
                 BackColor = ColorScheme.Primary,
                 ForeColor = Color.White,
-                Font = new Font("Cairo", 10F, FontStyle.Bold),
+                Font = new Font("Cairo", 10.5F, FontStyle.Bold),
                 Alignment = DataGridViewContentAlignment.MiddleCenter,
                 Padding = new Padding(10)
             },
@@ -366,8 +366,11 @@ public partial class UmrahReportsForm : Form
                 SelectionForeColor = ColorScheme.Primary,
                 Padding = new Padding(5)
             },
-            RowTemplate = { Height = 40 }
+            RowTemplate = { Height = 44 }
         };
+        
+        _packagesReportGrid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 249, 250);
+        _packagesReportGrid.ColumnHeadersHeight = 48;
         
         // Add columns
         _packagesReportGrid.Columns.Add(new DataGridViewTextBoxColumn 
@@ -454,8 +457,8 @@ public partial class UmrahReportsForm : Form
     // ═══════════════════════════════════════════
     private void InitializeProfitabilityTab(TabPage tab)
     {
-        tab.BackColor = ColorScheme.Background;
-        tab.Padding = new Padding(20);
+        tab.BackColor = Color.FromArgb(245, 247, 250);
+        tab.Padding = new Padding(15);
         
         _profitabilityGrid = new DataGridView
         {
@@ -474,12 +477,15 @@ public partial class UmrahReportsForm : Form
             {
                 BackColor = Color.FromArgb(76, 175, 80),
                 ForeColor = Color.White,
-                Font = new Font("Cairo", 10F, FontStyle.Bold),
+                Font = new Font("Cairo", 10.5F, FontStyle.Bold),
                 Alignment = DataGridViewContentAlignment.MiddleCenter,
                 Padding = new Padding(10)
             },
-            RowTemplate = { Height = 40 }
+            RowTemplate = { Height = 44 }
         };
+        
+        _profitabilityGrid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 249, 250);
+        _profitabilityGrid.ColumnHeadersHeight = 48;
         
         // Add profitability columns
         _profitabilityGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "PackageNumber", HeaderText = "رقم الحزمة" });
@@ -514,24 +520,24 @@ public partial class UmrahReportsForm : Form
     
     private void InitializeAnalyticsTab(TabPage tab)
     {
-        tab.BackColor = ColorScheme.Background;
-        tab.Padding = new Padding(20);
+        tab.BackColor = Color.FromArgb(245, 247, 250);
+        tab.Padding = new Padding(15);
         
         _analyticsSummaryPanel = new Panel
         {
             Dock = DockStyle.Fill,
             BackColor = Color.White,
-            Padding = new Padding(30),
+            Padding = new Padding(25),
             AutoScroll = true
         };
         
         Label titleLabel = new Label
         {
             Text = "📊 التحليلات المالية والإحصائيات",
-            Font = new Font("Cairo", 16F, FontStyle.Bold),
+            Font = new Font("Cairo", 14F, FontStyle.Bold),
             ForeColor = ColorScheme.Primary,
             AutoSize = true,
-            Location = new Point(30, 30)
+            Location = new Point(25, 25)
         };
         _analyticsSummaryPanel.Controls.Add(titleLabel);
         
@@ -547,7 +553,7 @@ public partial class UmrahReportsForm : Form
         {
             Text = text,
             Font = new Font("Cairo", 9.5F, FontStyle.Bold),
-            Size = new Size(170, 40),
+            Size = new Size(160, 36),
             Location = location,
             BackColor = color,
             ForeColor = Color.White,
@@ -560,18 +566,27 @@ public partial class UmrahReportsForm : Form
     {
         Panel card = new Panel
         {
-            Size = new Size(280, 100),
+            Size = new Size(260, 90),
             BackColor = Color.White,
-            Margin = new Padding(10),
+            Margin = new Padding(8),
             BorderStyle = BorderStyle.FixedSingle
         };
+        
+        // Colored top bar
+        Panel topBar = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 3,
+            BackColor = accentColor
+        };
+        card.Controls.Add(topBar);
         
         Label iconLabel = new Label
         {
             Text = icon,
-            Font = new Font("Segoe UI Emoji", 24F),
-            Location = new Point(15, 20),
-            Size = new Size(50, 50),
+            Font = new Font("Segoe UI Emoji", 22F),
+            Location = new Point(12, 15),
+            Size = new Size(45, 45),
             ForeColor = accentColor
         };
         card.Controls.Add(iconLabel);
@@ -579,9 +594,9 @@ public partial class UmrahReportsForm : Form
         Label titleLabel = new Label
         {
             Text = title,
-            Font = new Font("Cairo", 9F),
-            Location = new Point(75, 20),
-            Size = new Size(190, 25),
+            Font = new Font("Cairo", 8.5F),
+            Location = new Point(65, 15),
+            Size = new Size(180, 22),
             ForeColor = Color.Gray
         };
         card.Controls.Add(titleLabel);
@@ -589,9 +604,9 @@ public partial class UmrahReportsForm : Form
         Label valueLabel = new Label
         {
             Text = value,
-            Font = new Font("Cairo", 14F, FontStyle.Bold),
-            Location = new Point(75, 45),
-            Size = new Size(190, 35),
+            Font = new Font("Cairo", 12F, FontStyle.Bold),
+            Location = new Point(65, 40),
+            Size = new Size(180, 32),
             ForeColor = accentColor,
             Name = "value_" + title.Replace(" ", "_")
         };

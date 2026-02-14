@@ -181,6 +181,22 @@ public partial class AddEditUmrahPackageForm : Form
             EnableHeadersVisualStyles = false
         };
         
+        // ✅ إضافة معالج أخطاء للـ DataGridView لمنع أخطاء الترتيب
+        _dgvPilgrims.DataError += (s, e) =>
+        {
+            // منع ظهور رسالة الخطأ
+            e.ThrowException = false;
+        };
+        
+        // ✅ إضافة معالج للترتيب لتحويل القيم الفارغة
+        _dgvPilgrims.SortCompare += (s, e) =>
+        {
+            var val1 = e.CellValue1?.ToString() ?? "";
+            var val2 = e.CellValue2?.ToString() ?? "";
+            e.SortResult = string.Compare(val1, val2);
+            e.Handled = true;
+        };
+        
         // Add columns with explicit widths
         _dgvPilgrims.Columns.Add(new DataGridViewTextBoxColumn
         {
@@ -668,43 +684,63 @@ public partial class AddEditUmrahPackageForm : Form
             TextAlign = HorizontalAlignment.Center
         };
         
-        bool isFirstKeyPress = false;
+        bool shouldClearOnNextKey = false;
         
-        // عند الدخول للحقل، نحدد كل النص ونعلم أن الضغطة القادمة هي الأولى
+        // عند الدخول للحقل - تحديد كل النص
         numericUpDown.Enter += (s, e) => 
         {
-            numericUpDown.Select(0, numericUpDown.Text.Length);
-            isFirstKeyPress = true;
+            numericUpDown.BeginInvoke(new Action(() =>
+            {
+                numericUpDown.Select(0, numericUpDown.Text.Length);
+                shouldClearOnNextKey = true;
+            }));
         };
         
-        // عند الضغط بالماوس
-        numericUpDown.MouseClick += (s, e) => 
+        // عند الضغط بالماوس - تحديد كل النص
+        numericUpDown.MouseUp += (s, e) => 
+        {
+            if (numericUpDown.Focused)
+            {
+                numericUpDown.Select(0, numericUpDown.Text.Length);
+                shouldClearOnNextKey = true;
+            }
+        };
+        
+        // معالجة الكتابة - حذف القيمة القديمة عند الكتابة أول مرة
+        numericUpDown.KeyDown += (s, e) =>
+        {
+            if (shouldClearOnNextKey)
+            {
+                if (char.IsDigit((char)e.KeyCode) || 
+                    (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.NumPad9) ||
+                    e.KeyCode == Keys.Decimal || e.KeyCode == Keys.OemPeriod)
+                {
+                    // حذف القيمة القديمة
+                    numericUpDown.Value = 0;
+                    shouldClearOnNextKey = false;
+                }
+                else if (e.KeyCode == Keys.Back || e.KeyCode == Keys.Delete)
+                {
+                    numericUpDown.Value = 0;
+                    shouldClearOnNextKey = false;
+                    e.Handled = true;
+                }
+            }
+        };
+        
+        // إلغاء الـ flag عند ترك الحقل
+        numericUpDown.Leave += (s, e) => 
+        {
+            shouldClearOnNextKey = false;
+        };
+        
+        // إلغاء الـ flag عند استخدام الأسهم
+        numericUpDown.ValueChanged += (s, e) =>
         {
             if (!numericUpDown.Focused)
             {
-                numericUpDown.Select(0, numericUpDown.Text.Length);
-                isFirstKeyPress = true;
+                shouldClearOnNextKey = false;
             }
-        };
-        
-        // عند الضغط على أي مفتاح رقم، نمسح القيمة القديمة أولاً
-        numericUpDown.KeyPress += (s, e) => 
-        {
-            if (isFirstKeyPress && char.IsDigit(e.KeyChar))
-            {
-                numericUpDown.Value = 0;
-                isFirstKeyPress = false;
-            }
-            else if (!char.IsDigit(e.KeyChar) && e.KeyChar != (char)8 && e.KeyChar != '.' && e.KeyChar != ',')
-            {
-                isFirstKeyPress = false;
-            }
-        };
-        
-        // إذا ترك المستخدم الحقل، نعيد تعيين العلامة
-        numericUpDown.Leave += (s, e) => 
-        {
-            isFirstKeyPress = false;
         };
         
         parent.Controls.Add(numericUpDown);

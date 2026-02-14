@@ -415,6 +415,22 @@ public partial class AddEditTripForm : Form
         adultGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "GuideCostPerPerson", HeaderText = "المرشد/فرد", Width = 85, ReadOnly = true });
         adultGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "TotalCostPerPerson", HeaderText = "التكلفة/فرد", Width = 95, ReadOnly = true });
         
+        // ✅ إضافة معالج أخطاء للـ DataGridView لمنع أخطاء الترتيب
+        adultGrid.DataError += (s, e) =>
+        {
+            // منع ظهور رسالة الخطأ
+            e.ThrowException = false;
+        };
+        
+        // ✅ إضافة معالج للترتيب لتحويل القيم الفارغة
+        adultGrid.SortCompare += (s, e) =>
+        {
+            var val1 = e.CellValue1?.ToString() ?? "";
+            var val2 = e.CellValue2?.ToString() ?? "";
+            e.SortResult = string.Compare(val1, val2);
+            e.Handled = true;
+        };
+        
         // حساب تلقائي عند تغيير القيم
         adultGrid.CellValueChanged += (s, e) =>
         {
@@ -506,26 +522,26 @@ public partial class AddEditTripForm : Form
         };
         _contentPanel.Controls.Add(removeAdultButton);
         
-        // عرض Total للـ ADULT
+        // عرض Total للـ ADULT في سطر منفصل تحت الأزرار
         var adultTotalLabel = new Label
         {
             Text = "💰 إجمالي التكلفة (Adult): 0.00 جنيه",
             Font = new Font("Cairo", 10F, FontStyle.Bold),
             ForeColor = ColorScheme.Primary,
             AutoSize = true,
-            Location = new Point(20, y + 5),
+            Location = new Point(20, y + 50),
             Name = "adultTotalLabel"
         };
         _contentPanel.Controls.Add(adultTotalLabel);
         
-        // ✅ إضافة سعر الفرد (Adult)
+        // ✅ إضافة سعر الفرد (Adult) - بجانب Total في نفس السطر
         var adultPricePerPersonLabel = new Label
         {
             Text = "👤 سعر الفرد (Adult): 0.00 جنيه",
             Font = new Font("Cairo", 10F, FontStyle.Bold),
             ForeColor = Color.FromArgb(39, 174, 96),
             AutoSize = true,
-            Location = new Point(450, y + 5),
+            Location = new Point(400, y + 50),
             Name = "adultPricePerPersonLabel"
         };
         _contentPanel.Controls.Add(adultPricePerPersonLabel);
@@ -540,7 +556,7 @@ public partial class AddEditTripForm : Form
             }
         };
         
-        y += 60;
+        y += 90; // ✅ مسافة مناسبة للأزرار وال Labels
         
         // جدول CHILD
         AddLabel("📅 البرنامج اليومي - CHILD", 20, ref y, fontSize: 12, bold: true);
@@ -567,6 +583,22 @@ public partial class AddEditTripForm : Form
         childGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "GuideCost", HeaderText = "سعر المرشد", Width = 95 });
         childGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "GuideCostPerPerson", HeaderText = "المرشد/فرد", Width = 85, ReadOnly = true });
         childGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "TotalCostPerPerson", HeaderText = "التكلفة/فرد", Width = 95, ReadOnly = true });
+        
+        // ✅ إضافة معالج أخطاء للـ DataGridView لمنع أخطاء الترتيب
+        childGrid.DataError += (s, e) =>
+        {
+            // منع ظهور رسالة الخطأ
+            e.ThrowException = false;
+        };
+        
+        // ✅ إضافة معالج للترتيب لتحويل القيم الفارغة
+        childGrid.SortCompare += (s, e) =>
+        {
+            var val1 = e.CellValue1?.ToString() ?? "";
+            var val2 = e.CellValue2?.ToString() ?? "";
+            e.SortResult = string.Compare(val1, val2);
+            e.Handled = true;
+        };
         
         // حساب تلقائي عند تغيير القيم
         childGrid.CellValueChanged += (s, e) =>
@@ -659,26 +691,26 @@ public partial class AddEditTripForm : Form
         };
         _contentPanel.Controls.Add(removeChildButton);
         
-        // عرض Total للـ CHILD
+        // عرض Total للـ CHILD في سطر منفصل تحت الأزرار
         var childTotalLabel = new Label
         {
             Text = "💰 إجمالي التكلفة (Child): 0.00 جنيه",
             Font = new Font("Cairo", 10F, FontStyle.Bold),
             ForeColor = ColorScheme.Primary,
             AutoSize = true,
-            Location = new Point(20, y + 5),
+            Location = new Point(20, y + 50),
             Name = "childTotalLabel"
         };
         _contentPanel.Controls.Add(childTotalLabel);
         
-        // ✅ إضافة سعر الفرد (Child)
+        // ✅ إضافة سعر الفرد (Child) - بجانب Total في نفس السطر
         var childPricePerPersonLabel = new Label
         {
             Text = "👤 سعر الفرد (Child): 0.00 جنيه",
             Font = new Font("Cairo", 10F, FontStyle.Bold),
             ForeColor = Color.FromArgb(39, 174, 96),
             AutoSize = true,
-            Location = new Point(450, y + 5),
+            Location = new Point(400, y + 50),
             Name = "childPricePerPersonLabel"
         };
         _contentPanel.Controls.Add(childPricePerPersonLabel);
@@ -693,7 +725,7 @@ public partial class AddEditTripForm : Form
             }
         };
         
-        y += 60;
+        y += 100; // ✅ زيادة المسافة ليتسع لـ Label سعر الفرد
         
         // ═══════════════════════════════════════════════════════════
         // 🎯 المجموع الكلي (Adult + Child)
@@ -1047,6 +1079,22 @@ public partial class AddEditTripForm : Form
         _transportationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "SupplierName", HeaderText = "المورد", Width = 100 });
         _transportationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "DriverPhone", HeaderText = "هاتف السائق", Width = 100 });
         
+        // ✅ إضافة معالج أخطاء للـ DataGridView لمنع أخطاء الترتيب
+        _transportationGrid.DataError += (s, e) =>
+        {
+            // منع ظهور رسالة الخطأ
+            e.ThrowException = false;
+        };
+        
+        // ✅ إضافة معالج للترتيب لتحويل القيم الفارغة
+        _transportationGrid.SortCompare += (s, e) =>
+        {
+            var val1 = e.CellValue1?.ToString() ?? "";
+            var val2 = e.CellValue2?.ToString() ?? "";
+            e.SortResult = string.Compare(val1, val2);
+            e.Handled = true;
+        };
+        
         // ✅ لا تستدعي PopulateTransportationFromVisits() هنا
         // سيتم استدعاؤها من UpdateStep() حسب الشرط
         
@@ -1292,6 +1340,22 @@ public partial class AddEditTripForm : Form
         // عمود التكلفة الإجمالية (محسوب)
         _accommodationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "TotalCost", HeaderText = "الإجمالي", Width = 90, ReadOnly = true });
         
+        // ✅ إضافة معالج أخطاء للـ DataGridView لمنع أخطاء الترتيب
+        _accommodationGrid.DataError += (s, e) =>
+        {
+            // منع ظهور رسالة الخطأ
+            e.ThrowException = false;
+        };
+        
+        // ✅ إضافة معالج للترتيب لتحويل القيم الفارغة
+        _accommodationGrid.SortCompare += (s, e) =>
+        {
+            var val1 = e.CellValue1?.ToString() ?? "";
+            var val2 = e.CellValue2?.ToString() ?? "";
+            e.SortResult = string.Compare(val1, val2);
+            e.Handled = true;
+        };
+        
         // Add event handlers للحسابات التلقائية
         _accommodationGrid.CellValueChanged += AccommodationGrid_CellValueChanged;
         _accommodationGrid.CurrentCellDirtyStateChanged += (s, e) =>
@@ -1425,6 +1489,22 @@ public partial class AddEditTripForm : Form
         _expensesGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Amount", HeaderText = "المبلغ", Width = 120 });
         _expensesGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Notes", HeaderText = "ملاحظات", Width = 200 });
         
+        // ✅ إضافة معالج أخطاء للـ DataGridView لمنع أخطاء الترتيب
+        _expensesGrid.DataError += (s, e) =>
+        {
+            // منع ظهور رسالة الخطأ
+            e.ThrowException = false;
+        };
+        
+        // ✅ إضافة معالج للترتيب لتحويل القيم الفارغة
+        _expensesGrid.SortCompare += (s, e) =>
+        {
+            var val1 = e.CellValue1?.ToString() ?? "";
+            var val2 = e.CellValue2?.ToString() ?? "";
+            e.SortResult = string.Compare(val1, val2);
+            e.Handled = true;
+        };
+        
         // ✅ إضافة CurrentCellDirtyStateChanged لحفظ التعديلات فوراً
         _expensesGrid.CurrentCellDirtyStateChanged += (s, e) =>
         {
@@ -1502,6 +1582,22 @@ public partial class AddEditTripForm : Form
         _optionalToursGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "GuideCommission", HeaderText = "عمولة المرشد", Width = 100 });
         _optionalToursGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "SalesCommission", HeaderText = "عمولة المندوب", Width = 100 });
         _optionalToursGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "ParticipantsCount", HeaderText = "عدد الأفراد", Width = 100 });
+        
+        // ✅ إضافة معالج أخطاء للـ DataGridView لمنع أخطاء الترتيب
+        _optionalToursGrid.DataError += (s, e) =>
+        {
+            // منع ظهور رسالة الخطأ
+            e.ThrowException = false;
+        };
+        
+        // ✅ إضافة معالج للترتيب لتحويل القيم الفارغة
+        _optionalToursGrid.SortCompare += (s, e) =>
+        {
+            var val1 = e.CellValue1?.ToString() ?? "";
+            var val2 = e.CellValue2?.ToString() ?? "";
+            e.SortResult = string.Compare(val1, val2);
+            e.Handled = true;
+        };
         
         // ✅ إضافة CurrentCellDirtyStateChanged لحفظ التعديلات فوراً
         _optionalToursGrid.CurrentCellDirtyStateChanged += (s, e) =>

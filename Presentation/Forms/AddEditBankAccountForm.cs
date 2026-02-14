@@ -252,9 +252,9 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
 
                 if (_bankId.HasValue)
                 {
-                    // استخدام FirstOrDefault مع Tracking للتعديل
+                    // استخدام Find بدلاً من FirstOrDefault للتأكد من التعقب
                     bank = _context.Set<Domain.Entities.BankAccount>()
-                        .FirstOrDefault(b => b.Id == _bankId.Value);
+                        .Find(_bankId.Value);
                     
                     if (bank == null)
                     {
@@ -276,6 +276,9 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                     bank.Notes = string.IsNullOrWhiteSpace(txtNotes.Text) ? null : txtNotes.Text.Trim();
                     bank.ModifiedDate = DateTime.UtcNow;
                     bank.ModifiedBy = _currentUserId;
+                    
+                    // تحديث الحالة بشكل صريح
+                    _context.Entry(bank).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
                 }
                 else
                 {

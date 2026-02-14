@@ -127,6 +127,8 @@ public class SidebarControl : Panel
         AddSeparator(ref yPosition);
         AddMenuItem("reports", "📈", "التقارير", ref yPosition);
         AddMenuItem("accounting_reports", "📊", "التقارير المحاسبية", ref yPosition);
+        AddSeparator(ref yPosition);
+        AddMenuItem("filemanager", "📁", "إدارة الملفات", ref yPosition);
     }
 
     private void AddMenuItem(string id, string icon, string text, ref int yPosition, bool isActive = false)
@@ -350,6 +352,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("accounts", true, true);
             SetMenuItemEnabled("reports", true, true);
             SetMenuItemEnabled("accounting_reports", true, true);
+            SetMenuItemEnabled("filemanager", true, true); // ✅ إدارة الملفات للـ Admin فقط
         }
         else if (isAviationUser)
         {
@@ -382,6 +385,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("accounts", true, false);
             SetMenuItemEnabled("reports", true, false);
             SetMenuItemEnabled("accounting_reports", true, false);
+            SetMenuItemEnabled("filemanager", false, false); // ❌ إدارة الملفات معطلة ومخفية
         }
         else if (isOperationsUser)
         {
@@ -414,6 +418,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("accounts", true, false);
             SetMenuItemEnabled("reports", true, false);
             SetMenuItemEnabled("accounting_reports", true, false);
+            SetMenuItemEnabled("filemanager", false, false); // ❌ إدارة الملفات معطلة ومخفية
         }
         else if (isAccountingUser)
         {
@@ -445,6 +450,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("trips", true, false);
             SetMenuItemEnabled("reservations", true, false);
             SetMenuItemEnabled("reports", true, false);
+            SetMenuItemEnabled("filemanager", false, false); // ❌ إدارة الملفات معطلة ومخفية
         }
         else
         {
@@ -474,6 +480,7 @@ public class SidebarControl : Panel
             SetMenuItemEnabled("accounts", true, false);
             SetMenuItemEnabled("reports", true, false);
             SetMenuItemEnabled("accounting_reports", true, false);
+            SetMenuItemEnabled("filemanager", false, false); // ❌ إدارة الملفات معطلة ومخفية
         }
         
         Console.WriteLine("🔧 ApplyPermissionsSync completed\n");
