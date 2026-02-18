@@ -1286,7 +1286,6 @@ public class AppDbContext : DbContext
             entity.Property(e => e.CheckOutDate).HasColumnName("checkoutdate");
             entity.Property(e => e.CostPerRoomPerNight).HasColumnName("costperroompernight");
             entity.Property(e => e.GuideCost).HasColumnName("guidecost").HasColumnType("decimal(18,2)");
-            entity.Property(e => e.DriverTip).HasColumnName("drivertip").HasColumnType("decimal(18,2)");
             entity.Property(e => e.ParticipantsCount).HasColumnName("participantscount");
             entity.Property(e => e.MealPlan).HasColumnName("mealplan").HasMaxLength(100);
             entity.Property(e => e.Notes).HasColumnName("notes");
@@ -1326,13 +1325,10 @@ public class AppDbContext : DbContext
             entity.Property(e => e.TripTransportationId).HasColumnName("triptransportationid");
             entity.Property(e => e.TripId).HasColumnName("tripid");
             entity.Property(e => e.Type).HasColumnName("transportationtype").HasConversion<int>();
-            entity.Property(e => e.VehicleModel).HasColumnName("vehiclemodel").HasMaxLength(100);
             entity.Property(e => e.NumberOfVehicles).HasColumnName("numberofvehicles");
             entity.Property(e => e.SeatsPerVehicle).HasColumnName("seatspervehicle");
             entity.Property(e => e.CostPerVehicle).HasColumnName("costpervehicle");
-            entity.Property(e => e.SupplierName).HasColumnName("suppliername").HasMaxLength(200);
             entity.Property(e => e.DriverName).HasColumnName("drivername").HasMaxLength(100);
-            entity.Property(e => e.DriverPhone).HasColumnName("driverphone").HasMaxLength(20);
             entity.Property(e => e.Notes).HasColumnName("notes");
             entity.Property(e => e.SupplierId).HasColumnName("supplierid");
             entity.Property(e => e.PurchaseInvoiceId).HasColumnName("purchaseinvoiceid");
@@ -1667,12 +1663,19 @@ public class AppDbContext : DbContext
             entity.Property(e => e.SARExchangeRate).HasColumnName("sarexchangerate").HasColumnType("decimal(18,6)");
             entity.Property(e => e.AccommodationTotal).HasColumnName("accommodationtotal");
             entity.Property(e => e.BarcodePrice).HasColumnName("barcodeprice");
+            entity.Property(e => e.SupervisorBarcodePrice).HasColumnName("supervisorbarcodeprice");
             entity.Property(e => e.FlightPrice).HasColumnName("flightprice");
             entity.Property(e => e.FastTrainPriceSAR).HasColumnName("fasttrainpricesar");
             entity.Property(e => e.BrokerName).HasColumnName("brokername").HasMaxLength(200);
             entity.Property(e => e.SupervisorName).HasColumnName("supervisorname").HasMaxLength(200);
             entity.Property(e => e.Commission).HasColumnName("commission");
-            entity.Property(e => e.SupervisorExpenses).HasColumnName("supervisorexpenses");
+            entity.Property(e => e.SupervisorExpensesSAR).HasColumnName("supervisorexpensessar");
+            entity.Property(e => e.BusesCount).HasColumnName("busescount");
+            entity.Property(e => e.BusPriceSAR).HasColumnName("buspricessar");
+            entity.Property(e => e.GiftsPrice).HasColumnName("giftsprice");
+            entity.Property(e => e.OtherExpenses).HasColumnName("otherexpenses");
+            entity.Property(e => e.OtherExpensesNotes).HasColumnName("otherexpensesnotes").HasMaxLength(500);
+            entity.Property(e => e.ProfitMarginEGP).HasColumnName("profitmarginegp");
             entity.Property(e => e.Status).HasColumnName("status").HasConversion<int>();
             entity.Property(e => e.IsActive).HasColumnName("isactive");
             entity.Property(e => e.Notes).HasColumnName("notes");
@@ -1686,7 +1689,7 @@ public class AppDbContext : DbContext
             entity.Ignore(e => e.TotalCosts);
             entity.Ignore(e => e.TotalRevenue);
             entity.Ignore(e => e.NetProfit);
-            entity.Ignore(e => e.ProfitMargin);
+            entity.Ignore(e => e.ProfitMarginPercent);
             entity.Ignore(e => e.NetProfitPerPerson);
             entity.Ignore(e => e.TotalNights);
 

@@ -144,8 +144,9 @@ public partial class UmrahPackageDetailsForm : Form
                 { "سعر التأشيرة", $"{_package.VisaPriceSAR:N2} ر.س = {_package.VisaPriceEGP:N2} ج.م" },
                 { "سعر الصرف", $"{_package.SARExchangeRate:N4}" },
                 { "سعر الباركود", $"{_package.BarcodePrice:N2} ج.م" },
+                { "باركود المشرف", _package.SupervisorBarcodePrice > 0 ? $"{_package.SupervisorBarcodePrice:N2} ج.م  ⚠️ خاص بالمشرف" : "0.00 ج.م" },
                 { "العمولة", $"{_package.Commission:N2} ج.م" },
-                { "مصاريف المشرف", $"{_package.SupervisorExpenses:N2} ج.م" }
+                { "مصاريف المشرف", $"{_package.SupervisorExpensesSAR:N2} ر.س = {_package.SupervisorExpensesEGP:N2} ج.م" }
             }
         );
         pricingPanel.Location = new Point(30, y);
@@ -415,7 +416,7 @@ public partial class UmrahPackageDetailsForm : Form
         
         Label marginValue = new Label
         {
-            Text = $"{package.ProfitMargin:N1}%",
+            Text = $"{package.ProfitMarginPercent:N1}%",
             Font = new Font("Cairo", 16F, FontStyle.Bold),
             ForeColor = profitColor,
             Size = new Size(110, 45),

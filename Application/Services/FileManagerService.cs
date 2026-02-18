@@ -237,8 +237,10 @@ public class FileManagerService : IFileManagerService
         if (existing == null) return false;
         
         existing.FileName = document.FileName;
+        existing.OriginalFileName = document.OriginalFileName;
         existing.Description = document.Description;
         existing.Tags = document.Tags;
+        existing.FolderId = document.FolderId;
         existing.UpdatedAt = DateTime.UtcNow;
         existing.UpdatedBy = _authService.CurrentUser?.UserId ?? 1;
         

@@ -3,6 +3,7 @@ using System;
 using GraceWay.AccountingSystem.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GraceWay.AccountingSystem.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260215163624_RemoveDriverTipFromAccommodation")]
+    partial class RemoveDriverTipFromAccommodation
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3046,6 +3049,11 @@ namespace GraceWay.AccountingSystem.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("drivername");
 
+                    b.Property<string>("DriverPhone")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("driverphone");
+
                     b.Property<decimal>("DriverTip")
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("drivertip");
@@ -3082,6 +3090,11 @@ namespace GraceWay.AccountingSystem.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("supplierid");
 
+                    b.Property<string>("SupplierName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("suppliername");
+
                     b.Property<decimal>("TourLeaderTip")
                         .HasColumnType("decimal(18,2)")
                         .HasColumnName("tourleadertip");
@@ -3097,6 +3110,11 @@ namespace GraceWay.AccountingSystem.Infrastructure.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("integer")
                         .HasColumnName("transportationtype");
+
+                    b.Property<string>("VehicleModel")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("vehiclemodel");
 
                     b.Property<string>("VisitName")
                         .HasMaxLength(200)
@@ -3130,22 +3148,10 @@ namespace GraceWay.AccountingSystem.Infrastructure.Migrations
                         .HasColumnType("numeric")
                         .HasColumnName("barcodeprice");
 
-                    b.Property<decimal>("SupervisorBarcodePrice")
-                        .HasColumnType("numeric")
-                        .HasColumnName("supervisorbarcodeprice");
-
                     b.Property<string>("BrokerName")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("brokername");
-
-                    b.Property<decimal>("BusPriceSAR")
-                        .HasColumnType("numeric")
-                        .HasColumnName("buspricessar");
-
-                    b.Property<int>("BusesCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("busescount");
 
                     b.Property<decimal>("Commission")
                         .HasColumnType("numeric")
@@ -3170,10 +3176,6 @@ namespace GraceWay.AccountingSystem.Infrastructure.Migrations
                     b.Property<decimal>("FlightPrice")
                         .HasColumnType("numeric")
                         .HasColumnName("flightprice");
-
-                    b.Property<decimal>("GiftsPrice")
-                        .HasColumnType("numeric")
-                        .HasColumnName("giftsprice");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
@@ -3207,24 +3209,11 @@ namespace GraceWay.AccountingSystem.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("numberofpersons");
 
-                    b.Property<decimal>("OtherExpenses")
-                        .HasColumnType("numeric")
-                        .HasColumnName("otherexpenses");
-
-                    b.Property<string>("OtherExpensesNotes")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("otherexpensesnotes");
-
                     b.Property<string>("PackageNumber")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("packagenumber");
-
-                    b.Property<decimal>("ProfitMarginEGP")
-                        .HasColumnType("numeric")
-                        .HasColumnName("profitmarginegp");
 
                     b.Property<int>("RoomType")
                         .HasColumnType("integer")
@@ -3242,9 +3231,9 @@ namespace GraceWay.AccountingSystem.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
-                    b.Property<decimal>("SupervisorExpensesSAR")
+                    b.Property<decimal>("SupervisorExpenses")
                         .HasColumnType("numeric")
-                        .HasColumnName("supervisorexpensessar");
+                        .HasColumnName("supervisorexpenses");
 
                     b.Property<string>("SupervisorName")
                         .HasMaxLength(200)

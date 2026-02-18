@@ -459,8 +459,9 @@ public partial class TripFinancialDetailsForm : Form
                 
                 description += $" - {transportType}";
                 
-                if (!string.IsNullOrEmpty(transport.VehicleModel))
-                    description += $" ({transport.VehicleModel})";
+                // استخدام DriverName بدلاً من VehicleModel
+                if (!string.IsNullOrEmpty(transport.DriverName))
+                    description += $" ({transport.DriverName})";
                 
                 // إضافة تفاصيل الإكراميات
                 if (transport.TourLeaderTip > 0 || transport.DriverTip > 0)
@@ -491,17 +492,10 @@ public partial class TripFinancialDetailsForm : Form
             {
                 string description = $"{accommodation.HotelName} - {accommodation.RoomType}";
                 
-                // إضافة تفاصيل الإكراميات
-                if (accommodation.GuideCost > 0 || accommodation.DriverTip > 0)
+                // إضافة تفاصيل الإكرامية
+                if (accommodation.GuideCost > 0)
                 {
-                    description += " (";
-                    if (accommodation.GuideCost > 0)
-                        description += $"مرشد: {accommodation.GuideCost:N2}";
-                    if (accommodation.GuideCost > 0 && accommodation.DriverTip > 0)
-                        description += " + ";
-                    if (accommodation.DriverTip > 0)
-                        description += $"سواق: {accommodation.DriverTip:N2}";
-                    description += ")";
+                    description += $" (مرشد: {accommodation.GuideCost:N2})";
                 }
                 
                 _costGrid.Rows.Add(

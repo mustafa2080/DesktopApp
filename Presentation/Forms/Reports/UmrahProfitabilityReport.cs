@@ -182,7 +182,11 @@ public partial class UmrahProfitabilityReport : Form
         _exportButton.Click += ExportToExcel_Click;
         controlsPanel.Controls.Add(_exportButton);
         
-        Button refreshButton = CreateModernButton("🔄 تحديث", Color.FromArgb(155, 89, 182), new Point(1100, 10));
+        Button printButton = CreateModernButton("🖨️ طباعة", Color.FromArgb(220, 53, 69), new Point(1100, 10));
+        printButton.Click += PrintMainReport_Click;
+        controlsPanel.Controls.Add(printButton);
+        
+        Button refreshButton = CreateModernButton("🔄 تحديث", Color.FromArgb(155, 89, 182), new Point(1300, 10));
         refreshButton.Click += async (s, e) => await LoadDataAsync();
         controlsPanel.Controls.Add(refreshButton);
         
@@ -913,7 +917,7 @@ public partial class UmrahProfitabilityReport : Form
         decimal totalRevenue = packages.Sum(p => p.TotalRevenue);
         decimal totalCosts = packages.Sum(p => p.TotalCosts * p.NumberOfPersons);
         decimal netProfit = totalRevenue - totalCosts;
-        decimal avgMargin = totalPackages > 0 ? packages.Average(p => p.ProfitMargin) : 0;
+        decimal avgMargin = totalPackages > 0 ? packages.Average(p => p.ProfitMarginEGP) : 0;
         
         Console.WriteLine($"   Total packages: {totalPackages}");
         Console.WriteLine($"   Total pilgrims: {totalPilgrims}");
@@ -925,9 +929,10 @@ public partial class UmrahProfitabilityReport : Form
         // Update cards
         UpdateCardValue("totalPackages", totalPackages.ToString("N0"));
         UpdateCardValue("totalPilgrims", totalPilgrims.ToString("N0"));
-        UpdateCardValue("totalRevenue", totalRevenue.ToString("N2"));
-        UpdateCardValue("totalCosts", totalCosts.ToString("N2"));
-        UpdateCardValue("netProfit", netProfit.ToString("N2"));
+        UpdateCardValue("totalRevenue", totalRevenue.ToString("N0"));
+        UpdateCardValue("totalCosts", totalCosts.ToString("N0"));
+        string netProfitDisplay = netProfit >= 0 ? netProfit.ToString("N0") : $"({Math.Abs(netProfit):N0}) خسارة";
+        UpdateCardValue("netProfit", netProfitDisplay);
         UpdateCardValue("avgMargin", avgMargin.ToString("N2"));
         
         Console.WriteLine("✅ Dashboard updated successfully");
@@ -961,8 +966,15 @@ public partial class UmrahProfitabilityReport : Form
         Console.WriteLine($"📋 UpdateGrid called with {packages.Count} packages");
         _profitGrid.Rows.Clear();
         
-        // Sort by profit (highest first)
-        var sorted = packages.OrderByDescending(p => p.NetProfit).ToList();
+        // Sort by profit (highest first) - في الـ Memory بعد ما نجيبها من الداتابيز
+        var sorted = packages
+            .Select(p => new { 
+                Package = p, 
+                NetProfit = p.NetProfit 
+            })
+            .OrderByDescending(x => x.NetProfit)
+            .Select(x => x.Package)
+            .ToList();
         Console.WriteLine($"   Sorted {sorted.Count} packages by profit");
         
         int rowIndex = 0;
@@ -979,7 +991,7 @@ public partial class UmrahProfitabilityReport : Form
                     package.TotalRevenue,
                     package.TotalCosts * package.NumberOfPersons,
                     package.NetProfit,
-                    package.ProfitMargin,
+                    package.ProfitMarginEGP,
                     GetStatusArabic(package.Status)
                 );
                 rowIndex++;
@@ -1124,15 +1136,29 @@ public partial class UmrahProfitabilityReport : Form
         }
         
         // 7. مصاريف المشرف
-        if (package.SupervisorExpenses > 0)
+        if (package.SupervisorExpensesEGP > 0)
         {
             _detailGrid.Rows.Add(
                 "  👤 مصاريف المشرف",
-                package.SupervisorExpenses,
-                package.SupervisorExpenses * persons,
-                CostPct(package.SupervisorExpenses),
+                package.SupervisorExpensesEGP,
+                package.SupervisorExpensesEGP * persons,
+                CostPct(package.SupervisorExpensesEGP),
                 !string.IsNullOrEmpty(package.SupervisorName) ? $"المشرف: {package.SupervisorName}" : ""
             );
+        }
+
+        // 8. باركود المشرف (خاص بالمشرف فقط)
+        if (package.SupervisorBarcodePrice > 0)
+        {
+            int supBarcodeRow = _detailGrid.Rows.Add(
+                "  🔖 باركود المشرف",
+                package.SupervisorBarcodePrice,
+                package.SupervisorBarcodePrice,
+                CostPct(package.SupervisorBarcodePrice / (persons > 0 ? persons : 1)),
+                !string.IsNullOrEmpty(package.SupervisorName) ? $"⚠️ خاص بالمشرف: {package.SupervisorName}" : "⚠️ خاص بالمشرف"
+            );
+            _detailGrid.Rows[supBarcodeRow].DefaultCellStyle.ForeColor = Color.FromArgb(183, 28, 28);
+            _detailGrid.Rows[supBarcodeRow].DefaultCellStyle.Font = new Font("Cairo", 10F, FontStyle.Bold);
         }
         
         // ═══════════════════════════════════════════
@@ -1173,7 +1199,7 @@ public partial class UmrahProfitabilityReport : Form
             "💎 صافي الربح",
             package.NetProfitPerPerson,
             package.NetProfit,
-            package.ProfitMargin,
+            package.ProfitMarginEGP,
             package.NetProfit >= 0 ? "✅ ربح" : "❌ خسارة"
         );
         Color profitColor = package.NetProfit >= 0 ? Color.FromArgb(46, 204, 113) : Color.FromArgb(231, 76, 60);
@@ -1221,7 +1247,11 @@ public partial class UmrahProfitabilityReport : Form
             List<UmrahPackage> packagesToExport;
             if (_showAllCheckBox.Checked)
             {
-                packagesToExport = _currentPackages.OrderByDescending(p => p.NetProfit).ToList();
+                packagesToExport = _currentPackages
+                    .Select(p => new { Package = p, NetProfit = p.NetProfit })
+                    .OrderByDescending(x => x.NetProfit)
+                    .Select(x => x.Package)
+                    .ToList();
             }
             else
             {
@@ -1229,7 +1259,9 @@ public partial class UmrahProfitabilityReport : Form
                 var endDate = _endDatePicker.Value.Date.AddDays(1).AddSeconds(-1);
                 packagesToExport = _currentPackages
                     .Where(p => p.Date.Date >= startDate && p.Date.Date <= endDate)
-                    .OrderByDescending(p => p.NetProfit)
+                    .Select(p => new { Package = p, NetProfit = p.NetProfit })
+                    .OrderByDescending(x => x.NetProfit)
+                    .Select(x => x.Package)
                     .ToList();
             }
 
@@ -1396,13 +1428,26 @@ public partial class UmrahProfitabilityReport : Form
                 }
 
                 // مصاريف المشرف
-                if (package.SupervisorExpenses > 0)
+                if (package.SupervisorExpensesEGP > 0)
                 {
                     ws.Cell(row, 1).Value = "  👤 مصاريف المشرف";
-                    ws.Cell(row, 2).Value = package.SupervisorExpenses;
-                    ws.Cell(row, 3).Value = package.SupervisorExpenses * persons;
-                    ws.Cell(row, 4).Value = CostPct(package.SupervisorExpenses);
+                    ws.Cell(row, 2).Value = package.SupervisorExpensesEGP;
+                    ws.Cell(row, 3).Value = package.SupervisorExpensesEGP * persons;
+                    ws.Cell(row, 4).Value = CostPct(package.SupervisorExpensesEGP);
                     ws.Cell(row, 5).Value = !string.IsNullOrEmpty(package.SupervisorName) ? $"المشرف: {package.SupervisorName}" : "";
+                    row++;
+                }
+
+                // باركود المشرف (خاص بالمشرف فقط)
+                if (package.SupervisorBarcodePrice > 0)
+                {
+                    ws.Cell(row, 1).Value = "  🔖 باركود المشرف";
+                    ws.Cell(row, 2).Value = package.SupervisorBarcodePrice;
+                    ws.Cell(row, 3).Value = package.SupervisorBarcodePrice;
+                    ws.Cell(row, 4).Value = CostPct(package.SupervisorBarcodePrice / (persons > 0 ? persons : 1));
+                    ws.Cell(row, 5).Value = !string.IsNullOrEmpty(package.SupervisorName) ? $"⚠️ خاص بالمشرف: {package.SupervisorName}" : "⚠️ خاص بالمشرف";
+                    ws.Range(row, 1, row, 5).Style.Font.FontColor = ClosedXML.Excel.XLColor.FromHtml("#B71C1C");
+                    ws.Range(row, 1, row, 5).Style.Font.Bold = true;
                     row++;
                 }
 
@@ -1437,7 +1482,7 @@ public partial class UmrahProfitabilityReport : Form
                 ws.Cell(row, 1).Value = "💎 صافي الربح";
                 ws.Cell(row, 2).Value = package.NetProfitPerPerson;
                 ws.Cell(row, 3).Value = package.NetProfit;
-                ws.Cell(row, 4).Value = package.ProfitMargin;
+                ws.Cell(row, 4).Value = package.ProfitMarginPercent;
                 ws.Cell(row, 5).Value = package.NetProfit >= 0 ? "✅ ربح" : "❌ خسارة";
                 var profitRange = ws.Range(row, 1, row, 5);
                 profitRange.Style.Font.Bold = true;
@@ -1829,18 +1874,20 @@ public partial class UmrahProfitabilityReport : Form
             decimal totalRevenue = _selectedPackage.TotalRevenue;
             decimal totalCost = _selectedPackage.TotalCosts * persons;
             decimal totalProfit = _selectedPackage.NetProfit;
-            decimal profitMargin = _selectedPackage.ProfitMargin;
+            decimal profitMargin = _selectedPackage.ProfitMarginPercent;
             
             // استخدام فونت أكبر للأرقام المالية
             Font financialFont = new Font("Cairo", 11F, FontStyle.Bold);
             
-            DrawLabelValue(g, "💰 إجمالي الإيرادات:", $"{totalRevenue:N2} ج.م", 
+            DrawLabelValue(g, "💰 إجمالي الإيرادات:", $"{totalRevenue:N0} ج.م", 
                 labelFont, financialFont, greenBrush, margin, ref yPos, pageWidth);
             
-            DrawLabelValue(g, "💸 إجمالي التكاليف:", $"{totalCost:N2} ج.م", 
+            DrawLabelValue(g, "💸 إجمالي التكاليف:", $"{totalCost:N0} ج.م", 
                 labelFont, financialFont, redBrush, margin, ref yPos, pageWidth);
             
-            DrawLabelValue(g, "📈 صافي الربح:", $"{totalProfit:N2} ج.م", 
+            string printProfitLabel = totalProfit >= 0 ? "📈 صافي الربح:" : "⚠️ صافي الخسارة:";
+            string printProfitValue = totalProfit >= 0 ? $"{totalProfit:N0} ج.م" : $"({Math.Abs(totalProfit):N0}) ج.م";
+            DrawLabelValue(g, printProfitLabel, printProfitValue, 
                 labelFont, financialFont, totalProfit >= 0 ? greenBrush : redBrush, 
                 margin, ref yPos, pageWidth);
             
@@ -2022,6 +2069,272 @@ public partial class UmrahProfitabilityReport : Form
         g.DrawString(value, valueFont, brush, valueX - valueSize.Width, yPos);
         
         yPos += Math.Max(labelSize.Height, valueSize.Height) + 5;
+    }
+    
+    private void PrintMainReport_Click(object? sender, EventArgs e)
+    {
+        if (_currentPackages == null || !_currentPackages.Any())
+        {
+            MessageBox.Show("لا توجد بيانات للطباعة!", "تنبيه", 
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        try
+        {
+            // إنشاء PrintDocument
+            System.Drawing.Printing.PrintDocument printDocument = new System.Drawing.Printing.PrintDocument();
+            printDocument.PrintPage += PrintMainReport_PrintPage;
+            
+            // إنشاء PrintPreviewDialog
+            PrintPreviewDialog previewDialog = new PrintPreviewDialog
+            {
+                Document = printDocument,
+                Width = 1200,
+                Height = 800,
+                StartPosition = FormStartPosition.CenterScreen,
+                RightToLeft = RightToLeft.Yes,
+                RightToLeftLayout = true,
+                Text = "معاينة طباعة تقرير ربحية العمرة"
+            };
+            
+            previewDialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"خطأ في الطباعة: {ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+    
+    private void PrintMainReport_PrintPage(object sender, System.Drawing.Printing.PrintPageEventArgs e)
+    {
+        if (_currentPackages == null || !_currentPackages.Any() || e.Graphics == null) return;
+
+        try
+        {
+            Graphics g = e.Graphics;
+            Font titleFont = new Font("Cairo", 20F, FontStyle.Bold);
+            Font headerFont = new Font("Cairo", 12F, FontStyle.Bold);
+            Font tableHeaderFont = new Font("Cairo", 10F, FontStyle.Bold);
+            Font tableCellFont = new Font("Cairo", 9.5F);
+            Font summaryFont = new Font("Cairo", 11F, FontStyle.Bold);
+            
+            Brush blueBrush = new SolidBrush(Color.FromArgb(52, 152, 219));
+            Brush blackBrush = Brushes.Black;
+            Brush grayBrush = new SolidBrush(Color.FromArgb(127, 140, 141));
+            Brush greenBrush = new SolidBrush(Color.FromArgb(46, 204, 113));
+            Brush redBrush = new SolidBrush(Color.FromArgb(231, 76, 60));
+            
+            float yPos = 40;
+            float margin = 40;
+            float pageWidth = e.PageBounds.Width - (2 * margin);
+            
+            // العنوان الرئيسي
+            string title = "🕌 تقرير ربحية حزم العمرة";
+            SizeF titleSize = g.MeasureString(title, titleFont);
+            g.DrawString(title, titleFont, blueBrush, 
+                e.PageBounds.Width - margin - titleSize.Width, yPos);
+            yPos += titleSize.Height + 5;
+            
+            // التاريخ والفترة
+            string period = _showAllCheckBox.Checked ? 
+                "كل الفترات" : 
+                $"من {_startDatePicker.Value:yyyy/MM/dd} إلى {_endDatePicker.Value:yyyy/MM/dd}";
+            SizeF periodSize = g.MeasureString(period, headerFont);
+            g.DrawString(period, headerFont, grayBrush, 
+                e.PageBounds.Width - margin - periodSize.Width, yPos);
+            yPos += periodSize.Height + 5;
+            
+            // خط فاصل
+            g.DrawLine(new Pen(blueBrush, 2), margin, yPos, e.PageBounds.Width - margin, yPos);
+            yPos += 15;
+            
+            // الملخص
+            List<UmrahPackage> packagesInPeriod;
+            if (_showAllCheckBox.Checked)
+            {
+                packagesInPeriod = _currentPackages;
+            }
+            else
+            {
+                var startDate = _startDatePicker.Value.Date;
+                var endDate = _endDatePicker.Value.Date.AddDays(1).AddSeconds(-1);
+                packagesInPeriod = _currentPackages
+                    .Where(p => p.Date.Date >= startDate && p.Date.Date <= endDate)
+                    .ToList();
+            }
+            
+            int totalPackages = packagesInPeriod.Count;
+            int totalPilgrims = packagesInPeriod.Sum(p => p.NumberOfPersons);
+            decimal totalRevenue = packagesInPeriod.Sum(p => p.TotalRevenue);
+            decimal totalCosts = packagesInPeriod.Sum(p => p.TotalCosts * p.NumberOfPersons);
+            decimal netProfit = totalRevenue - totalCosts;
+            
+            // صندوق الملخص
+            float summaryBoxY = yPos;
+            Brush summaryBoxBrush = new SolidBrush(Color.FromArgb(240, 248, 255));
+            g.FillRectangle(summaryBoxBrush, margin, summaryBoxY, pageWidth, 120);
+            g.DrawRectangle(new Pen(blueBrush, 2), margin, summaryBoxY, pageWidth, 120);
+            
+            yPos = summaryBoxY + 15;
+            float col1X = e.PageBounds.Width - margin - 10;
+            float col2X = col1X - 250;
+            float col3X = col2X - 250;
+            
+            // صف 1
+            g.DrawString($"📦 إجمالي الحزم: {totalPackages}", summaryFont, blackBrush, col1X, yPos, 
+                new StringFormat { Alignment = StringAlignment.Far });
+            g.DrawString($"👥 المعتمرين: {totalPilgrims}", summaryFont, blackBrush, col2X, yPos,
+                new StringFormat { Alignment = StringAlignment.Far });
+            yPos += 30;
+            
+            // صف 2
+            g.DrawString($"💰 الإيرادات: {totalRevenue:N0} ج.م", summaryFont, greenBrush, col1X, yPos,
+                new StringFormat { Alignment = StringAlignment.Far });
+            g.DrawString($"💸 التكاليف: {totalCosts:N0} ج.م", summaryFont, redBrush, col2X, yPos,
+                new StringFormat { Alignment = StringAlignment.Far });
+            yPos += 30;
+            
+            // صف 3
+            Brush profitBrush = netProfit >= 0 ? greenBrush : redBrush;
+            string summaryProfitLabel = netProfit >= 0 ? "📈 صافي الربح" : "⚠️ صافي الخسارة";
+            string summaryProfitValue = netProfit >= 0 ? $"{netProfit:N0} ج.م" : $"({Math.Abs(netProfit):N0}) ج.م";
+            g.DrawString($"{summaryProfitLabel}: {summaryProfitValue}", summaryFont, profitBrush, col1X, yPos,
+                new StringFormat { Alignment = StringAlignment.Far });
+            
+            yPos = summaryBoxY + 130;
+            
+            // جدول الحزم
+            g.DrawString("تفاصيل الحزم", headerFont, blackBrush, 
+                e.PageBounds.Width - margin - g.MeasureString("تفاصيل الحزم", headerFont).Width, yPos);
+            yPos += 30;
+            
+            // رسم الجدول
+            float[] colWidths = { 
+                pageWidth * 0.12f,  // رقم الحزمة
+                pageWidth * 0.10f,  // التاريخ
+                pageWidth * 0.20f,  // اسم الرحلة
+                pageWidth * 0.08f,  // الأفراد
+                pageWidth * 0.13f,  // الإيرادات
+                pageWidth * 0.13f,  // التكاليف
+                pageWidth * 0.13f,  // الربح
+                pageWidth * 0.11f   // الحالة
+            };
+            
+            float tableStartX = margin;
+            float rowHeight = 30;
+            
+            // رأس الجدول
+            Brush headerBrush = new SolidBrush(Color.FromArgb(52, 73, 94));
+            g.FillRectangle(headerBrush, tableStartX, yPos, pageWidth, rowHeight);
+            g.DrawRectangle(new Pen(Color.FromArgb(52, 73, 94), 2), tableStartX, yPos, pageWidth, rowHeight);
+            
+            string[] headers = { "رقم الحزمة", "التاريخ", "اسم الرحلة", "الأفراد", "الإيرادات", "التكاليف", "الربح", "الحالة" };
+            float xPos = tableStartX;
+            
+            StringFormat centerFormat = new StringFormat { 
+                Alignment = StringAlignment.Center, 
+                LineAlignment = StringAlignment.Center 
+            };
+            
+            for (int i = 0; i < headers.Length; i++)
+            {
+                g.DrawString(headers[i], tableHeaderFont, Brushes.White, 
+                    new RectangleF(xPos, yPos, colWidths[i], rowHeight), centerFormat);
+                xPos += colWidths[i];
+                if (i < headers.Length - 1)
+                    g.DrawLine(Pens.White, xPos, yPos, xPos, yPos + rowHeight);
+            }
+            
+            yPos += rowHeight;
+            
+            // صفوف البيانات
+            var sortedPackages = packagesInPeriod
+                .Select(p => new { Package = p, NetProfit = p.NetProfit })
+                .OrderByDescending(x => x.NetProfit)
+                .Select(x => x.Package)
+                .Take(20) // أول 20 حزمة
+                .ToList();
+            
+            Brush altRowBrush = new SolidBrush(Color.FromArgb(248, 249, 250));
+            Pen borderPen = new Pen(Color.FromArgb(220, 220, 220), 1);
+            
+            int rowIndex = 0;
+            foreach (var package in sortedPackages)
+            {
+                if (yPos + rowHeight > e.PageBounds.Height - 80)
+                    break; // نهاية الصفحة
+                
+                // خلفية متبادلة
+                if (rowIndex % 2 == 1)
+                    g.FillRectangle(altRowBrush, tableStartX, yPos, pageWidth, rowHeight);
+                
+                g.DrawRectangle(borderPen, tableStartX, yPos, pageWidth, rowHeight);
+                
+                xPos = tableStartX;
+                
+                // البيانات
+                string[] data = {
+                    package.PackageNumber,
+                    package.Date.ToString("yyyy-MM-dd"),
+                    package.TripName.Length > 25 ? package.TripName.Substring(0, 22) + "..." : package.TripName,
+                    package.NumberOfPersons.ToString(),
+                    $"{package.TotalRevenue:N0}",
+                    $"{package.TotalCosts * package.NumberOfPersons:N0}",
+                    $"{package.NetProfit:N0}",
+                    GetStatusArabic(package.Status)
+                };
+                
+                for (int i = 0; i < data.Length; i++)
+                {
+                    Brush cellBrush = blackBrush;
+                    Font cellFont = tableCellFont;
+                    
+                    if (i == 4) cellBrush = greenBrush; // إيرادات
+                    else if (i == 5) cellBrush = redBrush; // تكاليف
+                    else if (i == 6) // ربح
+                    {
+                        cellBrush = package.NetProfit >= 0 ? greenBrush : redBrush;
+                        cellFont = new Font("Cairo", 9.5F, FontStyle.Bold);
+                    }
+                    
+                    g.DrawString(data[i], cellFont, cellBrush, 
+                        new RectangleF(xPos, yPos, colWidths[i], rowHeight), centerFormat);
+                    xPos += colWidths[i];
+                }
+                
+                yPos += rowHeight;
+                rowIndex++;
+            }
+            
+            // Footer
+            yPos = e.PageBounds.Height - 40;
+            string footer = $"تاريخ الطباعة: {DateTime.Now:yyyy/MM/dd HH:mm} • GraceWay Accounting System";
+            SizeF footerSize = g.MeasureString(footer, new Font("Cairo", 8F));
+            g.DrawString(footer, new Font("Cairo", 8F), grayBrush, 
+                (e.PageBounds.Width - footerSize.Width) / 2, yPos);
+            
+            // تنظيف
+            titleFont.Dispose();
+            headerFont.Dispose();
+            tableHeaderFont.Dispose();
+            tableCellFont.Dispose();
+            summaryFont.Dispose();
+            blueBrush.Dispose();
+            grayBrush.Dispose();
+            greenBrush.Dispose();
+            redBrush.Dispose();
+            altRowBrush.Dispose();
+            borderPen.Dispose();
+            headerBrush.Dispose();
+            summaryBoxBrush.Dispose();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"خطأ في رسم الصفحة: {ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
     }
     
     private string GetStatusArabic(PackageStatus status)

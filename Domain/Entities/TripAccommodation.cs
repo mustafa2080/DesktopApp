@@ -102,15 +102,9 @@ public class TripAccommodation
     public decimal GuideCost { get; set; }
     
     /// <summary>
-    /// إكرامية السائق
+    /// التكلفة الإجمالية (غرف + مرشد)
     /// </summary>
-    [Column("drivertip")]
-    public decimal DriverTip { get; set; }
-    
-    /// <summary>
-    /// التكلفة الإجمالية (غرف + مرشد + سائق)
-    /// </summary>
-    public decimal TotalCost => (NumberOfRooms * NumberOfNights * CostPerRoomPerNight) + GuideCost + DriverTip;
+    public decimal TotalCost => (NumberOfRooms * NumberOfNights * CostPerRoomPerNight) + GuideCost;
     
     /// <summary>
     /// نظام الوجبات (إفطار فقط، نصف إقامة، إقامة كاملة)

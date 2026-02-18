@@ -3,6 +3,7 @@ using System;
 using GraceWay.AccountingSystem.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GraceWay.AccountingSystem.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260216123002_FixUmrahEnhancements")]
+    partial class FixUmrahEnhancements
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -3129,10 +3132,6 @@ namespace GraceWay.AccountingSystem.Infrastructure.Migrations
                     b.Property<decimal>("BarcodePrice")
                         .HasColumnType("numeric")
                         .HasColumnName("barcodeprice");
-
-                    b.Property<decimal>("SupervisorBarcodePrice")
-                        .HasColumnType("numeric")
-                        .HasColumnName("supervisorbarcodeprice");
 
                     b.Property<string>("BrokerName")
                         .HasMaxLength(200)

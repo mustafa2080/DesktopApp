@@ -986,8 +986,8 @@ public partial class TripBookingsForm : Form
                 {
                     AddReportItem(reportPanel, $"النقل {transportIndex}:", transport.Type.ToString(), ref y, bold: true);
                     
-                    if (!string.IsNullOrEmpty(transport.VehicleModel))
-                        AddReportItem(reportPanel, "  الموديل:", transport.VehicleModel, ref y);
+                    if (!string.IsNullOrEmpty(transport.DriverName))
+                        AddReportItem(reportPanel, "  السائق:", transport.DriverName, ref y);
                     
                     AddReportItem(reportPanel, "  السعة:", $"{transport.TotalSeats} فرد", ref y);
                     AddReportItem(reportPanel, "  التكلفة الإجمالية:", $"{transport.TotalCost:N2} جنيه", ref y, bold: true, color: ColorScheme.Warning);

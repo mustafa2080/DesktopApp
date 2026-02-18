@@ -1,6 +1,6 @@
-﻿namespace GraceWay.AccountingSystem.Presentation.Forms
+namespace GraceWay.AccountingSystem.Presentation.Forms
 {
-    partial class CashBoxExpenseReportForm
+    partial class UmrahProfitabilityReportForm
     {
         private System.ComponentModel.IContainer components = null;
 
@@ -17,15 +17,12 @@
 
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
             this.SuspendLayout();
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 16F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1400, 900);
-            this.Name = "CashBoxExpenseReportForm";
-            this.Text = "تقرير المصروفات - Expense Report";
-            this.RightToLeft = System.Windows.Forms.RightToLeft.Yes;
-            this.RightToLeftLayout = true;
-            this.BackColor = System.Drawing.Color.FromArgb(240, 242, 245);
+            this.Name = "UmrahProfitabilityReportForm";
+            this.Text = "UmrahProfitabilityReportForm";
             this.ResumeLayout(false);
         }
 

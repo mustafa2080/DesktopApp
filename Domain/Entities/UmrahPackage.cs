@@ -129,6 +129,11 @@ public class UmrahPackage
     public decimal BarcodePrice { get; set; }
     
     /// <summary>
+    /// سعر باركود المشرف (بالجنيه المصري) - خاص بالمشرف فقط
+    /// </summary>
+    public decimal SupervisorBarcodePrice { get; set; }
+    
+    /// <summary>
     /// سعر الطيران (بالجنيه المصري)
     /// </summary>
     public decimal FlightPrice { get; set; }
@@ -142,6 +147,37 @@ public class UmrahPackage
     /// سعر القطار السريع بالجنيه المصري (محسوب)
     /// </summary>
     public decimal FastTrainPriceEGP => FastTrainPriceSAR * SARExchangeRate;
+    
+    /// <summary>
+    /// عدد الباصات
+    /// </summary>
+    public int BusesCount { get; set; }
+    
+    /// <summary>
+    /// سعر الباص الواحد (بالريال السعودي)
+    /// </summary>
+    public decimal BusPriceSAR { get; set; }
+    
+    /// <summary>
+    /// سعر الباصات بالجنيه المصري (محسوب)
+    /// </summary>
+    public decimal BusPriceEGP => BusPriceSAR * SARExchangeRate * BusesCount;
+    
+    /// <summary>
+    /// سعر الهدايا (بالجنيه المصري)
+    /// </summary>
+    public decimal GiftsPrice { get; set; }
+    
+    /// <summary>
+    /// مصروفات أخرى (بالجنيه المصري)
+    /// </summary>
+    public decimal OtherExpenses { get; set; }
+    
+    /// <summary>
+    /// ملاحظات المصروفات الأخرى
+    /// </summary>
+    [MaxLength(500)]
+    public string? OtherExpensesNotes { get; set; }
     
     // ══════════════════════════════════════
     // الوسيط والمشرف
@@ -165,16 +201,26 @@ public class UmrahPackage
     public decimal Commission { get; set; }
     
     /// <summary>
-    /// مصاريف المشرف (بالجنيه المصري)
+    /// مصاريف المشرف (بالريال السعودي)
     /// </summary>
-    public decimal SupervisorExpenses { get; set; }
+    public decimal SupervisorExpensesSAR { get; set; }
+    
+    /// <summary>
+    /// مصاريف المشرف بالجنيه المصري (محسوب)
+    /// </summary>
+    public decimal SupervisorExpensesEGP => SupervisorExpensesSAR * SARExchangeRate;
     
     // ══════════════════════════════════════
     // الحسابات المالية
     // ══════════════════════════════════════
     
     /// <summary>
-    /// إجمالي التكاليف (محسوب)
+    /// هامش الربح (بالجنيه المصري)
+    /// </summary>
+    public decimal ProfitMarginEGP { get; set; }
+    
+    /// <summary>
+    /// إجمالي التكاليف للفرد الواحد (محسوب)
     /// </summary>
     public decimal TotalCosts => 
         VisaPriceEGP + 
@@ -182,8 +228,14 @@ public class UmrahPackage
         BarcodePrice + 
         FlightPrice + 
         FastTrainPriceEGP + 
+        OtherExpenses +
         Commission + 
-        SupervisorExpenses;
+        (NumberOfPersons > 0 ? (SupervisorBarcodePrice + BusPriceEGP + GiftsPrice + SupervisorExpensesEGP) / NumberOfPersons : 0);
+    
+    /// <summary>
+    /// سعر البيع المحسوب (التكاليف + هامش الربح) - للفرد
+    /// </summary>
+    public decimal CalculatedSellingPrice => TotalCosts + ProfitMarginEGP;
     
     /// <summary>
     /// إجمالي الإيرادات (محسوب)
@@ -191,14 +243,19 @@ public class UmrahPackage
     public decimal TotalRevenue => SellingPrice * NumberOfPersons;
     
     /// <summary>
-    /// صافي الربح (محسوب)
+    /// إجمالي التكاليف الكلي (للجميع)
     /// </summary>
-    public decimal NetProfit => TotalRevenue - (TotalCosts * NumberOfPersons);
+    public decimal TotalCostsAll => TotalCosts * NumberOfPersons;
     
     /// <summary>
-    /// هامش الربح %
+    /// صافي الربح (محسوب)
     /// </summary>
-    public decimal ProfitMargin => TotalRevenue > 0 ? 
+    public decimal NetProfit => TotalRevenue - TotalCostsAll;
+    
+    /// <summary>
+    /// نسبة هامش الربح %
+    /// </summary>
+    public decimal ProfitMarginPercent => TotalRevenue > 0 ? 
         (NetProfit / TotalRevenue * 100) : 0;
     
     /// <summary>

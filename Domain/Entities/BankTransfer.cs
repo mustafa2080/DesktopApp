@@ -16,6 +16,9 @@ namespace GraceWay.AccountingSystem.Domain.Entities
         public string? Notes { get; set; }
         public string? ReferenceNumber { get; set; }
         
+        // Link to Trip for Fawateerk payments
+        public int? TripId { get; set; }
+        
         [Column("createdby")]
         public int CreatedBy { get; set; }
         
@@ -27,5 +30,6 @@ namespace GraceWay.AccountingSystem.Domain.Entities
         public virtual BankAccount? DestinationBankAccount { get; set; }
         public virtual CashBox? SourceCashBox { get; set; }
         public virtual CashBox? DestinationCashBox { get; set; }
+        public virtual Trip? Trip { get; set; }
     }
 }

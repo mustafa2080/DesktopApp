@@ -653,15 +653,15 @@ public partial class TripDetailsForm : Form
                 transportDate,
                 GetTransportTypeText(transport.Type),
                 transport.Route ?? "-",
-                transport.VehicleModel ?? "-",
+                transport.DriverName ?? "-",
                 transport.SeatsPerVehicle,
                 transport.ParticipantsCount,
                 $"{transport.CostPerVehicle:N2}",
                 $"{transport.TourLeaderTip:N2}",
                 $"{transport.DriverTip:N2}",
                 $"{total:N2}",
-                transport.SupplierName ?? "-",
-                transport.DriverPhone ?? "-"
+                transport.Supplier?.SupplierName ?? "-",
+                transport.DriverName ?? "-"
             );
         }
         
@@ -691,7 +691,6 @@ public partial class TripDetailsForm : Form
         
         decimal totalAccommodationCost = _trip.Accommodations.Sum(a => a.TotalCost);
         decimal totalGuideCost = _trip.Accommodations.Sum(a => a.GuideCost);
-        decimal totalDriverTip = _trip.Accommodations.Sum(a => a.DriverTip);
         int totalNights = _trip.Accommodations.Sum(a => a.NumberOfNights);
         int totalRooms = _trip.Accommodations.Sum(a => a.NumberOfRooms);
         
@@ -708,7 +707,7 @@ public partial class TripDetailsForm : Form
         
         var summaryLabel2 = new Label
         {
-            Text = $"💰 تكلفة الإقامة: {totalAccommodationCost:N2} جنيه | 👨‍🏫 تكلفة المرشدين: {totalGuideCost:N2} جنيه | 🚗 إكرامية السائقين: {totalDriverTip:N2} جنيه",
+            Text = $"💰 تكلفة الإقامة: {totalAccommodationCost:N2} جنيه | 👨‍🏫 تكلفة المرشدين: {totalGuideCost:N2} جنيه",
             Font = new Font("Cairo", 10F),
             ForeColor = Color.FromArgb(80, 80, 80),
             AutoSize = false,
@@ -748,7 +747,6 @@ public partial class TripDetailsForm : Form
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "MealPlan", HeaderText = "الوجبات", FillWeight = 70 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "CostPer", HeaderText = "السعر/ليلة", FillWeight = 90 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "GuideCost", HeaderText = "تكلفة المرشد", FillWeight = 100 });
-        grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "DriverTip", HeaderText = "إكرامية السائق", FillWeight = 110 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Total", HeaderText = "الإجمالي", FillWeight = 110 });
         
         // تنسيق الهيدر
@@ -787,7 +785,6 @@ public partial class TripDetailsForm : Form
                 acc.MealPlan ?? "-",
                 $"{acc.CostPerRoomPerNight:N2}",
                 $"{acc.GuideCost:N2}",
-                $"{acc.DriverTip:N2}",
                 $"{acc.TotalCost:N2}"
             );
             
@@ -798,7 +795,7 @@ public partial class TripDetailsForm : Form
             }
             
             // محاذاة الأرقام إلى اليمين
-            for (int i = 4; i <= 12; i++)
+            for (int i = 4; i <= 11; i++)
             {
                 grid.Rows[rowIndex].Cells[i].Style.Alignment = DataGridViewContentAlignment.MiddleRight;
             }
@@ -819,7 +816,6 @@ public partial class TripDetailsForm : Form
             "",
             "",
             $"{totalGuideCost:N2}",
-            $"{totalDriverTip:N2}",
             $"{totalAccommodationCost:N2}"
         );
         
@@ -828,7 +824,7 @@ public partial class TripDetailsForm : Form
         grid.Rows[totalRowIndex].DefaultCellStyle.ForeColor = ColorScheme.Primary;
         
         // محاذاة الأرقام في صف الإجمالي
-        for (int i = 4; i <= 12; i++)
+        for (int i = 4; i <= 11; i++)
         {
             grid.Rows[totalRowIndex].Cells[i].Style.Alignment = DataGridViewContentAlignment.MiddleRight;
         }
@@ -1512,18 +1508,15 @@ public partial class TripDetailsForm : Form
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "CheckOut", HeaderText = "تاريخ الخروج", Width = 100 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "CostPerNight", HeaderText = "السعر/ليلة", Width = 100 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "GuideCost", HeaderText = "تكلفة المرشد", Width = 100 });
-        grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "DriverTip", HeaderText = "إكرامية السائق", Width = 110 });
         grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Total", HeaderText = "الإجمالي", Width = 120 });
         
         decimal totalAccommodationCost = 0;
         decimal totalGuideCost = 0;
-        decimal totalDriverTip = 0;
         
         foreach (var accommodation in _trip.Accommodations)
         {
             totalAccommodationCost += accommodation.TotalCost;
             totalGuideCost += accommodation.GuideCost;
-            totalDriverTip += accommodation.DriverTip;
             
             // التصنيف بالنجوم
             string rating = "-";
@@ -1547,7 +1540,6 @@ public partial class TripDetailsForm : Form
                 accommodation.CheckOutDate.ToString("yyyy-MM-dd"),
                 $"{accommodation.CostPerRoomPerNight:N2}",
                 $"{accommodation.GuideCost:N2}",
-                $"{accommodation.DriverTip:N2}",
                 $"{accommodation.TotalCost:N2}"
             );
         }
@@ -1558,7 +1550,6 @@ public partial class TripDetailsForm : Form
             _trip.Accommodations.Sum(a => a.NumberOfNights),
             "", "", "",
             $"{totalGuideCost:N2}",
-            $"{totalDriverTip:N2}",
             $"{totalAccommodationCost:N2} جنيه");
         grid.Rows[grid.Rows.Count - 1].DefaultCellStyle.BackColor = Color.FromArgb(255, 243, 205);
         grid.Rows[grid.Rows.Count - 1].DefaultCellStyle.Font = new Font("Cairo", 9F, FontStyle.Bold);

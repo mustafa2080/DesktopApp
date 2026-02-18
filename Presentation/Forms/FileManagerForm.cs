@@ -391,7 +391,7 @@ public partial class FileManagerForm : Form
         mFav.Click   += async (s, e) => await ToggleFavoriteAsync();
         mRen.Click   += async (s, e) => await RenameFileAsync();
         mMov.Click   += async (s, e) => await MoveFileAsync();
-        mProp.Click  += ShowFileProperties;
+        mProp.Click  += async (s, e) => await ShowFilePropertiesAsync();
         mDel.Click   += async (s, e) => await DeleteFileAsync();
         _documentContextMenu.Items.AddRange(new ToolStripItem[] { mOpen, mDl, new ToolStripSeparator(), mFav, mRen, mMov, new ToolStripSeparator(), mProp, new ToolStripSeparator(), mDel });
 
@@ -543,8 +543,14 @@ public partial class FileManagerForm : Form
             if (!File.Exists(doc.FilePath)) { ClosePreview(); return; }
 
             // تحميل الصورة
-            using var stream = new FileStream(doc.FilePath, FileMode.Open, FileAccess.Read);
-            var img = Image.FromStream(stream, false, false);
+            // ✅ FIX: Load image properly to avoid GDI+ errors
+            Image img;
+            using (var stream = new FileStream(doc.FilePath, FileMode.Open, FileAccess.Read))
+            {
+                var originalImg = Image.FromStream(stream, false, false);
+                img = new Bitmap(originalImg);
+                originalImg.Dispose();
+            }
             _previewImage.Image?.Dispose();
             _previewImage.Image = img;
 
@@ -701,31 +707,178 @@ public partial class FileManagerForm : Form
 
     private async Task ToggleFavoriteAsync()
     {
-        if (_lvDocuments.SelectedItems.Count == 0 || _lvDocuments.SelectedItems[0].Tag is not FileDocument doc) return;
-        try { await _fileService.ToggleFavoriteAsync(doc.DocumentId); await LoadDocumentsAsync(); }
+        var doc = GetSelectedDocument();
+        if (doc == null) return;
+        try
+        {
+            bool wasAlreadyFavorite = doc.IsFavorite;
+            await _fileService.ToggleFavoriteAsync(doc.DocumentId);
+            await LoadDocumentsAsync();
+            MessageBox.Show(!wasAlreadyFavorite ? "تمت الإضافة للمفضلة ⭐" : "تمت الإزالة من المفضلة",
+                "المفضلة", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
         catch (Exception ex) { MessageBox.Show($"خطأ:\n{ex.Message}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
 
     private async Task RenameFileAsync()
     {
-        if (_lvDocuments.SelectedItems.Count == 0 || _lvDocuments.SelectedItems[0].Tag is not FileDocument doc) return;
-        var name = Microsoft.VisualBasic.Interaction.InputBox("أدخل الاسم الجديد:", "إعادة تسمية", doc.OriginalFileName);
-        if (string.IsNullOrWhiteSpace(name)) return;
-        try { doc.OriginalFileName = name; await _fileService.UpdateDocumentAsync(doc); await LoadDocumentsAsync(); }
+        var doc = GetSelectedDocument();
+        if (doc == null) return;
+
+        using var dlg = new Form
+        {
+            Text = "✏️ إعادة تسمية",
+            Size = new Size(420, 170),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false, MinimizeBox = false,
+            RightToLeft = RightToLeft.Yes, RightToLeftLayout = true,
+            Font = new Font("Cairo", 10F)
+        };
+
+        var pnlBottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 50, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(10) };
+        var btnOk  = new Button { Text = "✔ موافق",  DialogResult = DialogResult.OK,  Size = new Size(100, 34), BackColor = ColorScheme.Primary, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        var btnCnl = new Button { Text = "✖ إلغاء", DialogResult = DialogResult.Cancel, Size = new Size(100, 34), FlatStyle = FlatStyle.Flat };
+        btnOk.FlatAppearance.BorderSize = btnCnl.FlatAppearance.BorderSize = 0;
+        dlg.AcceptButton = btnOk; dlg.CancelButton = btnCnl;
+        pnlBottom.Controls.AddRange(new Control[] { btnOk, btnCnl });
+
+        var txt = new TextBox { Text = doc.OriginalFileName, Dock = DockStyle.Bottom, Height = 32 };
+        var lbl = new Label { Text = "الاسم الجديد:", Dock = DockStyle.Bottom, Height = 26, TextAlign = ContentAlignment.MiddleRight, Padding = new Padding(0, 8, 0, 0) };
+
+        // ترتيب الإضافة مهم: Bottom أولاً ثم أعلى → pnlBottom يظهر في الأسفل، txt فوقه، lbl فوق txt
+        dlg.Controls.Add(pnlBottom);
+        dlg.Controls.Add(txt);
+        dlg.Controls.Add(lbl);
+
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+        var newName = txt.Text.Trim();
+        if (string.IsNullOrWhiteSpace(newName)) return;
+
+        try
+        {
+            doc.OriginalFileName = newName;
+            await _fileService.UpdateDocumentAsync(doc);
+            await LoadDocumentsAsync();
+            MessageBox.Show("تم تغيير الاسم بنجاح ✔", "نجح", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
         catch (Exception ex) { MessageBox.Show($"خطأ:\n{ex.Message}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error); }
     }
 
-    private Task MoveFileAsync()
-    { MessageBox.Show("سيتم إضافة هذه الميزة قريباً", "قريباً", MessageBoxButtons.OK, MessageBoxIcon.Information); return Task.CompletedTask; }
-
-    private void ShowFileProperties(object? sender, EventArgs e)
+    private async Task MoveFileAsync()
     {
-        if (_lvDocuments.SelectedItems.Count == 0 || _lvDocuments.SelectedItems[0].Tag is not FileDocument doc) return;
-        MessageBox.Show(
-            $"📄  {doc.OriginalFileName}\n📊  {doc.DocumentType}\n💾  {FormatFileSize(doc.FileSize)}\n" +
-            $"📅  {doc.UploadedAt:dd/MM/yyyy HH:mm}\n👤  {doc.Uploader?.FullName ?? "غير معروف"}\n" +
-            $"📥  مرات التحميل: {doc.DownloadCount}\n⭐  مفضل: {(doc.IsFavorite ? "نعم" : "لا")}",
-            "خصائص الملف", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        var doc = GetSelectedDocument();
+        if (doc == null) return;
+
+        if (_allFolders.Count == 0)
+        {
+            MessageBox.Show("لا توجد مجلدات متاحة", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        using var dlg = new Form
+        {
+            Text = "📦 نقل إلى مجلد آخر",
+            Size = new Size(420, 200),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false, MinimizeBox = false,
+            RightToLeft = RightToLeft.Yes, RightToLeftLayout = true,
+            Font = new Font("Cairo", 10F)
+        };
+        var cmb = new ComboBox
+        {
+            Dock = DockStyle.Bottom, Height = 32, DropDownStyle = ComboBoxStyle.DropDownList,
+            DisplayMember = "FolderName", ValueMember = "FolderId"
+        };
+        cmb.DataSource = _allFolders.Where(f => f.FolderId != doc.FolderId).ToList();
+
+        var pnl = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 50, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(10) };
+        var btnOk  = new Button { Text = "✔ نقل",   DialogResult = DialogResult.OK,  Size = new Size(100, 34), BackColor = ColorScheme.Primary, ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        var btnCnl = new Button { Text = "✖ إلغاء", DialogResult = DialogResult.Cancel, Size = new Size(100, 34), FlatStyle = FlatStyle.Flat };
+        btnOk.FlatAppearance.BorderSize = btnCnl.FlatAppearance.BorderSize = 0;
+        dlg.AcceptButton = btnOk; dlg.CancelButton = btnCnl;
+        pnl.Controls.AddRange(new Control[] { btnOk, btnCnl });
+        // ترتيب الإضافة: Bottom أولاً ← pnl في الأسفل، cmb فوقه، lbl فوق cmb
+        dlg.Controls.Add(pnl);
+        dlg.Controls.Add(cmb);
+        dlg.Controls.Add(new Label { Text = "اختر المجلد:", Dock = DockStyle.Bottom, Height = 26, TextAlign = ContentAlignment.MiddleRight });
+
+        if (dlg.ShowDialog(this) != DialogResult.OK || cmb.SelectedItem is not FileFolder targetFolder) return;
+
+        try
+        {
+            doc.FolderId = targetFolder.FolderId;
+            await _fileService.UpdateDocumentAsync(doc);
+            await LoadDocumentsAsync();
+            MessageBox.Show($"تم النقل إلى '{targetFolder.FolderName}' بنجاح ✔", "نجح", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex) { MessageBox.Show($"خطأ:\n{ex.Message}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error); }
+    }
+
+    private async Task ShowFilePropertiesAsync()
+    {
+        var docTag = GetSelectedDocument();
+        if (docTag == null) return;
+
+        // جيب الـ document من DB مع Uploader
+        FileDocument? doc;
+        try
+        {
+            doc = await _fileService.GetDocumentByIdAsync(docTag.DocumentId);
+            if (doc == null) { MessageBox.Show("الملف غير موجود", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+        }
+        catch (Exception ex) { MessageBox.Show($"خطأ:\n{ex.Message}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+
+        using var dlg = new Form
+        {
+            Text = "ℹ️ خصائص الملف",
+            Size = new Size(420, 320),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false, MinimizeBox = false,
+            RightToLeft = RightToLeft.Yes, RightToLeftLayout = true,
+            Font = new Font("Cairo", 10F), BackColor = Color.White
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 7,
+            Padding = new Padding(15), BackColor = Color.White
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130F));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+
+        void AddRow(int r, string label, string value, Color? clr = null)
+        {
+            layout.Controls.Add(new Label { Text = label, Font = new Font("Cairo", 10F, FontStyle.Bold), ForeColor = Color.Gray, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 0, r);
+            layout.Controls.Add(new Label { Text = value, Font = new Font("Cairo", 10F), ForeColor = clr ?? Color.Black, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight }, 1, r);
+        }
+
+        AddRow(0, "📄 اسم الملف:", doc.OriginalFileName);
+        AddRow(1, "📊 النوع:", doc.DocumentType.ToString());
+        AddRow(2, "💾 الحجم:", FormatFileSize(doc.FileSize));
+        AddRow(3, "📅 تاريخ الرفع:", doc.UploadedAt.ToString("dd/MM/yyyy HH:mm"));
+        AddRow(4, "👤 رفع بواسطة:", doc.Uploader?.FullName ?? "غير معروف");
+        AddRow(5, "📥 مرات التحميل:", doc.DownloadCount.ToString());
+        AddRow(6, "⭐ مفضل:", doc.IsFavorite ? "نعم" : "لا", doc.IsFavorite ? Color.FromArgb(255, 160, 0) : Color.Gray);
+
+        var btnClose = new Button
+        {
+            Text = "إغلاق", Dock = DockStyle.Bottom, Height = 40,
+            BackColor = ColorScheme.Primary, ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat, DialogResult = DialogResult.OK, Font = new Font("Cairo", 10F, FontStyle.Bold)
+        };
+        btnClose.FlatAppearance.BorderSize = 0;
+        dlg.Controls.Add(layout);
+        dlg.Controls.Add(btnClose);
+        dlg.ShowDialog(this);
+    }
+
+    private FileDocument? GetSelectedDocument()
+    {
+        if (_lvDocuments.SelectedItems.Count == 0) return null;
+        return _lvDocuments.SelectedItems[0].Tag as FileDocument;
     }
 
     private async Task SearchDocumentsAsync()

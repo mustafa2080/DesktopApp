@@ -499,9 +499,13 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
 
                             // Get trip info if selected
                             string tripInfo = "";
+                            int? selectedTripId = null;
+                            
                             if (cmbTrip.SelectedValue != null && Convert.ToInt32(cmbTrip.SelectedValue) > 0)
                             {
                                 int tripId = Convert.ToInt32(cmbTrip.SelectedValue);
+                                selectedTripId = tripId;
+                                
                                 var trip = _context.Set<Trip>().FirstOrDefault(t => t.TripId == tripId);
                                 if (trip != null)
                                 {
@@ -518,6 +522,7 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                                 TransferDate = DateTime.SpecifyKind(dtpPaymentDate.Value, DateTimeKind.Utc),
                                 ReferenceNumber = txtReferenceNumber.Text.Trim(),
                                 Notes = $"دفعة من فواتيرك - العميل: {cmbCustomer.Text}{tripInfo}\n{txtNotes.Text.Trim()}",
+                                TripId = selectedTripId,  // ✅ NEW: Save Trip ID
                                 CreatedBy = _currentUserId,
                                 CreatedDate = DateTime.UtcNow
                             };

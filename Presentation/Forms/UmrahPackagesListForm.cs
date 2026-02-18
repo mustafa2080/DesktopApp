@@ -325,6 +325,23 @@ public partial class UmrahPackagesListForm : Form
         {
             if (e.RowIndex >= 0) ShowDetails_Click(s, e);
         };
+
+        // عرض الخسارة كنص في الـ Cell مع الحفاظ على القيمة الرقمية
+        _packagesGrid.CellFormatting += (s, e) =>
+        {
+            if (e.ColumnIndex < 0 || e.RowIndex < 0) return;
+            if (_packagesGrid.Columns[e.ColumnIndex].Name != "NetProfit") return;
+            if (e.Value == null || e.Value == DBNull.Value) return;
+
+            if (decimal.TryParse(e.Value.ToString(), System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out decimal profit))
+            {
+                e.Value = profit < 0
+                    ? $"({Math.Abs(profit):N0}) خسارة"
+                    : $"{profit:N0}";
+                e.FormattingApplied = true;
+            }
+        };
         
         // Add hover effect
         _packagesGrid.CellMouseEnter += (s, e) =>
@@ -496,7 +513,6 @@ public partial class UmrahPackagesListForm : Form
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
             DefaultCellStyle = new DataGridViewCellStyle 
             { 
-                Format = "#,##0 ج",
                 Font = new Font("Cairo", 10F, FontStyle.Bold),
                 Alignment = DataGridViewContentAlignment.MiddleCenter
             }
@@ -606,62 +622,7 @@ public partial class UmrahPackagesListForm : Form
             Console.WriteLine($"✅ Grid DataSource set. Row count: {_packagesGrid.Rows.Count}");
             
             // Color-code status and profit with modern badges
-            foreach (DataGridViewRow row in _packagesGrid.Rows)
-            {
-                var status = row.Cells["Status"].Value?.ToString();
-                var profitValue = row.Cells["NetProfit"].Value;
-                
-                if (profitValue == null || profitValue == DBNull.Value)
-                    continue;
-                
-                decimal profit = Convert.ToDecimal(profitValue);
-                
-                // Status badge colors with better contrast
-                var statusCell = row.Cells["Status"];
-                statusCell.Style.Font = new Font("Cairo", 9F, FontStyle.Bold);
-                statusCell.Style.Padding = new Padding(8, 5, 8, 5);
-                
-                switch (status)
-                {
-                    case "مكتمل":
-                        statusCell.Style.BackColor = Color.FromArgb(232, 245, 233); // Light green
-                        statusCell.Style.ForeColor = Color.FromArgb(27, 94, 32);    // Dark green
-                        break;
-                    case "ملغي":
-                        statusCell.Style.BackColor = Color.FromArgb(255, 235, 238); // Light red
-                        statusCell.Style.ForeColor = Color.FromArgb(183, 28, 28);   // Dark red
-                        break;
-                    case "قيد التنفيذ":
-                        statusCell.Style.BackColor = Color.FromArgb(255, 243, 224); // Light orange
-                        statusCell.Style.ForeColor = Color.FromArgb(230, 81, 0);    // Dark orange
-                        break;
-                    case "مؤكد":
-                        statusCell.Style.BackColor = Color.FromArgb(227, 242, 253); // Light blue
-                        statusCell.Style.ForeColor = Color.FromArgb(13, 71, 161);   // Dark blue
-                        break;
-                    case "مسودة":
-                        statusCell.Style.BackColor = Color.FromArgb(245, 245, 245); // Light gray
-                        statusCell.Style.ForeColor = Color.FromArgb(97, 97, 97);    // Dark gray
-                        break;
-                }
-                
-                // Profit colors - Just change color, don't modify value
-                var profitCell = row.Cells["NetProfit"];
-                if (profit < 0)
-                {
-                    profitCell.Style.ForeColor = Color.FromArgb(211, 47, 47);  // Red for loss
-                    profitCell.Style.Font = new Font("Cairo", 10F, FontStyle.Bold);
-                }
-                else if (profit > 0)
-                {
-                    profitCell.Style.ForeColor = Color.FromArgb(56, 142, 60);  // Green for profit
-                    profitCell.Style.Font = new Font("Cairo", 10F, FontStyle.Bold);
-                }
-                else
-                {
-                    profitCell.Style.ForeColor = Color.FromArgb(117, 117, 117); // Gray for break-even
-                }
-            }
+            ApplyGridStyling();
             
             Console.WriteLine("✅ LoadDataAsync completed successfully!");
         }
@@ -671,6 +632,67 @@ public partial class UmrahPackagesListForm : Form
             Console.WriteLine($"Stack trace: {ex.StackTrace}");
             MessageBox.Show($"حدث خطأ أثناء تحميل البيانات:\n{ex.Message}", "خطأ",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ApplyGridStyling()
+    {
+        foreach (DataGridViewRow row in _packagesGrid.Rows)
+        {
+            var status = row.Cells["Status"].Value?.ToString();
+            var profitValue = row.Cells["NetProfit"].Value;
+
+            if (profitValue == null || profitValue == DBNull.Value)
+                continue;
+
+            if (!decimal.TryParse(profitValue?.ToString(), System.Globalization.NumberStyles.Any, 
+                System.Globalization.CultureInfo.InvariantCulture, out decimal profit))
+                continue;
+
+            // Status badge colors
+            var statusCell = row.Cells["Status"];
+            statusCell.Style.Font = new Font("Cairo", 9F, FontStyle.Bold);
+            statusCell.Style.Padding = new Padding(8, 5, 8, 5);
+            switch (status)
+            {
+                case "مكتمل":
+                    statusCell.Style.BackColor = Color.FromArgb(232, 245, 233);
+                    statusCell.Style.ForeColor = Color.FromArgb(27, 94, 32);
+                    break;
+                case "ملغي":
+                    statusCell.Style.BackColor = Color.FromArgb(255, 235, 238);
+                    statusCell.Style.ForeColor = Color.FromArgb(183, 28, 28);
+                    break;
+                case "قيد التنفيذ":
+                    statusCell.Style.BackColor = Color.FromArgb(255, 243, 224);
+                    statusCell.Style.ForeColor = Color.FromArgb(230, 81, 0);
+                    break;
+                case "مؤكد":
+                    statusCell.Style.BackColor = Color.FromArgb(227, 242, 253);
+                    statusCell.Style.ForeColor = Color.FromArgb(13, 71, 161);
+                    break;
+                case "مسودة":
+                    statusCell.Style.BackColor = Color.FromArgb(245, 245, 245);
+                    statusCell.Style.ForeColor = Color.FromArgb(97, 97, 97);
+                    break;
+            }
+
+            // Profit: لون فقط - العرض هيتعمل في CellFormatting
+            var profitCell = row.Cells["NetProfit"];
+            if (profit < 0)
+            {
+                profitCell.Style.ForeColor = Color.FromArgb(211, 47, 47);
+                profitCell.Style.Font = new Font("Cairo", 10F, FontStyle.Bold);
+            }
+            else if (profit > 0)
+            {
+                profitCell.Style.ForeColor = Color.FromArgb(56, 142, 60);
+                profitCell.Style.Font = new Font("Cairo", 10F, FontStyle.Bold);
+            }
+            else
+            {
+                profitCell.Style.ForeColor = Color.FromArgb(117, 117, 117);
+            }
         }
     }
     
@@ -704,6 +726,7 @@ public partial class UmrahPackagesListForm : Form
             }).ToList();
             
             _packagesGrid.DataSource = displayList;
+            ApplyGridStyling();
         }
         catch (Exception ex)
         {

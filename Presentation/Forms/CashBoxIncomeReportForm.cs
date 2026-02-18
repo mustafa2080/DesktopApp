@@ -46,13 +46,43 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
         {
             _contextFactory = contextFactory;
             _currentUserId = currentUserId;
-            _startDate = DateTime.UtcNow.Date.AddDays(-30); // آخر 30 يوم
+            _startDate = DateTime.UtcNow.Date.AddDays(-30);
             _endDate = DateTime.UtcNow.Date;
 
             InitializeComponent();
             BuildUI();
             _isInitializing = false;
-            _ = LoadDataAsync();
+
+            // ✅ Use HandleCreated + VisibleChanged for reliable loading in both TopLevel and embedded modes
+            bool _dataLoaded = false;
+            
+            // HandleCreated fires when the window handle is created (works for embedded forms)
+            this.HandleCreated += async (s, e) =>
+            {
+                if (!_dataLoaded)
+                {
+                    _dataLoaded = true;
+                    await LoadDataAsync();
+                }
+            };
+            
+            // Fallback: VisibleChanged in case HandleCreated doesn't fire
+            this.VisibleChanged += async (s, e) =>
+            {
+                if (this.Visible && !_dataLoaded)
+                {
+                    _dataLoaded = true;
+                    await LoadDataAsync();
+                }
+            };
+        }
+
+        /// <summary>
+        /// يُستدعى صريحاً من MainForm عند تحميل التاب لضمان تحميل البيانات
+        /// </summary>
+        public async Task LoadDataExplicitly()
+        {
+            await LoadDataAsync();
         }
 
         private void BuildUI()
@@ -563,6 +593,7 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
             try
             {
                 this.Cursor = Cursors.WaitCursor;
+                System.Diagnostics.Debug.WriteLine("INCOME: LoadDataAsync started");
 
                 using var ctx1 = _contextFactory.CreateDbContext();
                 var cashBoxes = await ctx1.CashBoxes
@@ -570,40 +601,56 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
                     .OrderBy(c => c.Name)
                     .ToListAsync();
 
-                if (cmbCashBox.Items.Count == 0)
-                {
-                    cmbCashBox.DisplayMember = "Name";
-                    cmbCashBox.ValueMember = "Id";
-                    
-                    foreach (var cb in cashBoxes)
-                        cmbCashBox.Items.Add(cb);
+                System.Diagnostics.Debug.WriteLine($"INCOME: CashBoxes count = {cashBoxes.Count}");
 
-                    if (cmbCashBox.Items.Count > 0)
-                        cmbCashBox.SelectedIndex = 0;
+                if (cashBoxes.Count == 0)
+                {
+                    MessageBox.Show("⚠️ لا توجد خزن نشطة في قاعدة البيانات!\nأضف خزنة أولاً من قسم الخزنة.", 
+                        "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button1,
+                        MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                    return;
                 }
 
-                var selectedCashBoxId = (_selectedCashBox as CashBox)?.Id ?? 
-                                       (cmbCashBox.SelectedItem as CashBox)?.Id;
-                
+                if (cmbCashBox.Items.Count == 0)
+                {
+                    // ✅ Disable event temporarily to avoid re-triggering LoadDataAsync
+                    _isInitializing = true;
+                    cmbCashBox.DisplayMember = "Name";
+                    cmbCashBox.ValueMember = "Id";
+                    foreach (var cb in cashBoxes)
+                        cmbCashBox.Items.Add(cb);
+                    if (cmbCashBox.Items.Count > 0)
+                        cmbCashBox.SelectedIndex = 0;
+                    _isInitializing = false;
+                }
+
+                var selectedCashBoxId = (cmbCashBox.SelectedItem as CashBox)?.Id;
                 if (!selectedCashBoxId.HasValue) return;
 
-                using var ctx2 = _contextFactory.CreateDbContext();
-                _selectedCashBox = await ctx2.CashBoxes
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(c => c.Id == selectedCashBoxId.Value && !c.IsDeleted);
-
+                _selectedCashBox = cashBoxes.FirstOrDefault(c => c.Id == selectedCashBoxId.Value);
                 if (_selectedCashBox == null) return;
+
+                // ✅ Fix: .Date is not translatable in SQLite - load in memory with date range check
+                var startUtc = DateTime.SpecifyKind(_startDate.Date, DateTimeKind.Utc);
+                var endUtc = DateTime.SpecifyKind(_endDate.Date.AddDays(1), DateTimeKind.Utc);
 
                 using var ctx3 = _contextFactory.CreateDbContext();
                 _incomeTransactions = await ctx3.CashTransactions
                     .AsNoTracking()
-                    .Where(t => t.CashBoxId == _selectedCashBox.Id && 
+                    .Where(t => t.CashBoxId == _selectedCashBox.Id &&
                                 !t.IsDeleted &&
                                 t.Type == TransactionType.Income &&
-                                t.TransactionDate.Date >= _startDate.Date &&
-                                t.TransactionDate.Date <= _endDate.Date)
+                                t.TransactionDate >= startUtc &&
+                                t.TransactionDate < endUtc)
                     .OrderByDescending(t => t.TransactionDate)
                     .ToListAsync();
+
+                System.Diagnostics.Debug.WriteLine($"INCOME: Transactions loaded = {_incomeTransactions.Count}");
+                if (_incomeTransactions.Count == 0)
+                {
+                    System.Diagnostics.Debug.WriteLine($"INCOME: No transactions found for CashBox={_selectedCashBox.Id}, Start={startUtc}, End={endUtc}");
+                }
 
                 UpdateSummary();
                 UpdateGrid();
@@ -611,8 +658,13 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"خطأ في تحميل البيانات:\n{ex.Message}", "خطأ",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // ✅ Show FULL error including inner exception for debugging
+                var fullError = ex.ToString();
+                MessageBox.Show($"❌ خطأ في تقرير الإيرادات:\n\n{ex.Message}\n\nInner: {ex.InnerException?.Message}\n\nStack:\n{ex.StackTrace?.Split('\n').FirstOrDefault()}", 
+                    "خطأ تشخيص", MessageBoxButtons.OK, MessageBoxIcon.Error,
+                    MessageBoxDefaultButton.Button1,
+                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                System.Diagnostics.Debug.WriteLine($"INCOME REPORT ERROR: {fullError}");
             }
             finally
             {

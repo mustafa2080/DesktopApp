@@ -340,7 +340,7 @@ public class Trip
         TotalCost = 
             programCost +                           // ✅ البرنامج اليومي (المزارات + المرشد)
             transportationCost +                    // ✅ النقل (المواصلات + الإكراميات)
-            Accommodations.Sum(a => a.TotalCost) +  // ✅ الإقامة (شاملة إكرامية المرشد والسواق)
+            Accommodations.Sum(a => a.TotalCost) +  // ✅ الإقامة (الغرف + تكلفة المرشد)
             Guides.Sum(g => g.TotalCost) +          // ✅ المرشدين الرئيسيين
             optionalToursCost +                     // ✅ الرحلات الاختيارية
             Expenses.Sum(e => e.Amount);            // ✅ المصاريف الأخرى

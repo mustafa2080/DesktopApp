@@ -22,12 +22,6 @@ public class TripTransportation
     public TransportationType Type { get; set; }
     
     /// <summary>
-    /// موديل السيارة/الطائرة (مرسيدس 2023، بوينج 737، إلخ)
-    /// </summary>
-    [MaxLength(100)]
-    public string? VehicleModel { get; set; }
-    
-    /// <summary>
     /// عدد السيارات/الوسائل
     /// </summary>
     public int NumberOfVehicles { get; set; } = 1;
@@ -53,22 +47,10 @@ public class TripTransportation
     public decimal TotalCost => (NumberOfVehicles * CostPerVehicle) + TourLeaderTip + DriverTip;
     
     /// <summary>
-    /// اسم شركة النقل/المورد
-    /// </summary>
-    [MaxLength(200)]
-    public string? SupplierName { get; set; }
-    
-    /// <summary>
     /// اسم السائق
     /// </summary>
     [MaxLength(100)]
     public string? DriverName { get; set; }
-    
-    /// <summary>
-    /// رقم هاتف السائق
-    /// </summary>
-    [MaxLength(20)]
-    public string? DriverPhone { get; set; }
     
     /// <summary>
     /// تاريخ النقل

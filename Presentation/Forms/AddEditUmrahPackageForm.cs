@@ -38,16 +38,25 @@ public partial class AddEditUmrahPackageForm : Form
     private NumericUpDown _numBarcodePrice = null!;
     private NumericUpDown _numFlightPrice = null!;
     private NumericUpDown _numFastTrainSAR = null!;
+    private NumericUpDown _numBusesCount = null!;
+    private NumericUpDown _numBusPriceSAR = null!;
+    private NumericUpDown _numGiftsPrice = null!;
+    private NumericUpDown _numOtherExpenses = null!;
+    private TextBox _txtOtherExpensesNotes = null!;
+    private NumericUpDown _numProfitMarginEGP = null!; // ✅ هامش الربح بالجنيه
     
-    // Broker & Supervisor
+    private NumericUpDown _numSupervisorBarcodePrice = null!;
+    private Label _lblSupervisorBarcodeNote = null!;
     private TextBox _txtBrokerName = null!;
     private TextBox _txtSupervisorName = null!;
     private NumericUpDown _numCommission = null!;
-    private NumericUpDown _numSupervisorExpenses = null!;
+    private NumericUpDown _numSupervisorExpensesSAR = null!; // ✅ تغيير لـ SAR
     
     // Calculated Fields (Read-only)
     private Label _lblVisaEGP = null!;
     private Label _lblFastTrainEGP = null!;
+    private Label _lblBusEGP = null!;
+    private Label _lblSupervisorEGP = null!;
     private Label _lblTotalCosts = null!;
     private Label _lblTotalRevenue = null!;
     private Label _lblNetProfit = null!;
@@ -197,6 +206,22 @@ public partial class AddEditUmrahPackageForm : Form
             e.Handled = true;
         };
         
+        // ✅ عمود مخفي للـ PilgrimNumber (مهم للتحديث)
+        _dgvPilgrims.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "PilgrimNumber",
+            HeaderText = "PilgrimNumber",
+            Visible = false
+        });
+        
+        // ✅ عمود مخفي للـ UmrahPilgrimId (مهم للتحديث)
+        _dgvPilgrims.Columns.Add(new DataGridViewTextBoxColumn
+        {
+            Name = "UmrahPilgrimId",
+            HeaderText = "UmrahPilgrimId",
+            Visible = false
+        });
+        
         // Add columns with explicit widths
         _dgvPilgrims.Columns.Add(new DataGridViewTextBoxColumn
         {
@@ -244,30 +269,7 @@ public partial class AddEditUmrahPackageForm : Form
         roomTypeColumn.Items.Add("رباعي");
         roomTypeColumn.Items.Add("خماسي");
         
-        // ✅ منع عرض القيم الإنجليزية
-        roomTypeColumn.DisplayStyleForCurrentCellOnly = false;
-        
         _dgvPilgrims.Columns.Add(roomTypeColumn);
-        
-        // ✅ معالج لتحويل أي قيمة إنجليزية إلى عربية تلقائياً
-        _dgvPilgrims.CellValueChanged += (s, e) =>
-        {
-            if (e.RowIndex >= 0 && e.ColumnIndex == _dgvPilgrims.Columns["RoomType"].Index)
-            {
-                var cell = _dgvPilgrims.Rows[e.RowIndex].Cells["RoomType"];
-                if (cell.Value != null)
-                {
-                    string currentValue = cell.Value.ToString() ?? "";
-                    string normalizedValue = NormalizeRoomType(currentValue);
-                    
-                    if (currentValue != normalizedValue)
-                    {
-                        Console.WriteLine($"⚠️ Converting room type from '{currentValue}' to '{normalizedValue}'");
-                        cell.Value = normalizedValue;
-                    }
-                }
-            }
-        };
         
         // إضافة عمود رقم الغرفة المشتركة
         _dgvPilgrims.Columns.Add(new DataGridViewTextBoxColumn
@@ -286,26 +288,6 @@ public partial class AddEditUmrahPackageForm : Form
         {
             column.SortMode = DataGridViewColumnSortMode.NotSortable;
         }
-        
-        // ✅ معالج لضمان عرض القيم العربية فقط
-        _dgvPilgrims.CellFormatting += (s, e) =>
-        {
-            if (e.ColumnIndex == _dgvPilgrims.Columns["RoomType"].Index && e.RowIndex >= 0)
-            {
-                if (e.Value != null)
-                {
-                    string value = e.Value.ToString() ?? "";
-                    // إذا كانت القيمة إنجليزية، حولها فوراً
-                    if (value == "Single" || value == "Double" || value == "Triple" || 
-                        value == "Quad" || value == "Quint" || value == "Suite")
-                    {
-                        string arabicValue = NormalizeRoomType(value);
-                        e.Value = arabicValue;
-                        Console.WriteLine($"🔄 Auto-converted '{value}' to '{arabicValue}' during display");
-                    }
-                }
-            }
-        };
         
         mainPanel.Controls.Add(_dgvPilgrims);
         yPosition += 220;
@@ -346,10 +328,11 @@ public partial class AddEditUmrahPackageForm : Form
         // ══════════════════════════════════════════════════════════════
         AddSectionHeader(mainPanel, "💰 الأسعار والتكاليف", ref yPosition);
         
-        // Row 1: Selling Price
+        // Row 1: Selling Price (Calculated - Read Only)
         AddLabel(mainPanel, "سعر البيع (للفرد):", 30, yPosition);
         _numSellingPrice = AddNumericUpDown(mainPanel, 200, yPosition, 0, 1000000, 2);
-        _numSellingPrice.ValueChanged += (s, e) => CalculateTotals();
+        _numSellingPrice.ReadOnly = true;
+        _numSellingPrice.BackColor = ColorScheme.LightGray;
         AddCurrencyLabel(mainPanel, "ج.م", 420, yPosition);
         yPosition += 60;
         
@@ -390,6 +373,43 @@ public partial class AddEditUmrahPackageForm : Form
         _numFastTrainSAR.ValueChanged += (s, e) => CalculateTotals();
         AddCurrencyLabel(mainPanel, "ر.س", 840, yPosition);
         _lblFastTrainEGP = AddCalculatedLabel(mainPanel, "= 0 ج.م", 950, yPosition);
+        yPosition += 60;
+        
+        // Row 5: Buses Count + Bus Price SAR
+        AddLabel(mainPanel, "عدد الباصات:", 30, yPosition);
+        _numBusesCount = AddNumericUpDown(mainPanel, 200, yPosition, 0, 50);
+        _numBusesCount.ValueChanged += (s, e) => CalculateTotals();
+
+        AddLabel(mainPanel, "سعر الباص:", 490, yPosition);
+        _numBusPriceSAR = AddNumericUpDown(mainPanel, 620, yPosition, 0, 100000, 2);
+        _numBusPriceSAR.ValueChanged += (s, e) => CalculateTotals();
+        AddCurrencyLabel(mainPanel, "ر.س", 840, yPosition);
+        _lblBusEGP = AddCalculatedLabel(mainPanel, "= 0 ج.م", 950, yPosition);
+        yPosition += 60;
+
+        // Row 6: Gifts Price (Total for all persons)
+        AddLabel(mainPanel, "سعر الهدايا (إجمالي):", 30, yPosition);
+        _numGiftsPrice = AddNumericUpDown(mainPanel, 200, yPosition, 0, 1000000, 2);
+        _numGiftsPrice.ValueChanged += (s, e) => CalculateTotals();
+        AddCurrencyLabel(mainPanel, "ج.م", 420, yPosition);
+        yPosition += 60;
+
+        // Row 7: Other Expenses + Notes
+        AddLabel(mainPanel, "مصروفات أخرى:", 30, yPosition);
+        _numOtherExpenses = AddNumericUpDown(mainPanel, 200, yPosition, 0, 1000000, 2);
+        _numOtherExpenses.ValueChanged += (s, e) => CalculateTotals();
+        AddCurrencyLabel(mainPanel, "ج.م", 420, yPosition);
+
+        AddLabel(mainPanel, "ملاحظات:", 540, yPosition);
+        _txtOtherExpensesNotes = AddTextBox(mainPanel, 660, yPosition, 360);
+        _txtOtherExpensesNotes.PlaceholderText = "تفاصيل المصروفات الأخرى...";
+        yPosition += 60;
+
+        // Row 8: Profit Margin in EGP (not percentage)
+        AddLabel(mainPanel, "هامش الربح:", 30, yPosition);
+        _numProfitMarginEGP = AddNumericUpDown(mainPanel, 200, yPosition, 0, 1000000, 2);
+        _numProfitMarginEGP.ValueChanged += (s, e) => CalculateTotals();
+        AddCurrencyLabel(mainPanel, "ج.م", 420, yPosition);
         yPosition += 80;
         
         // ══════════════════════════════════════════════════════════════
@@ -407,14 +427,25 @@ public partial class AddEditUmrahPackageForm : Form
         AddCurrencyLabel(mainPanel, "ج.م", 900, yPosition);
         yPosition += 60;
         
-        // Row 2: Supervisor Name + Expenses
+        // Row 2: Supervisor Name + Expenses (SAR)
         AddLabel(mainPanel, "اسم المشرف:", 30, yPosition);
         _txtSupervisorName = AddTextBox(mainPanel, 200, yPosition, 330);
         
         AddLabel(mainPanel, "مصاريف المشرف:", 580, yPosition);
-        _numSupervisorExpenses = AddNumericUpDown(mainPanel, 750, yPosition, 0, 100000, 2);
-        _numSupervisorExpenses.ValueChanged += (s, e) => CalculateTotals();
-        AddCurrencyLabel(mainPanel, "ج.م", 970, yPosition);
+        _numSupervisorExpensesSAR = AddNumericUpDown(mainPanel, 750, yPosition, 0, 100000, 2);
+        _numSupervisorExpensesSAR.ValueChanged += (s, e) => CalculateTotals();
+        AddCurrencyLabel(mainPanel, "ر.س", 970, yPosition);
+        _lblSupervisorEGP = AddCalculatedLabel(mainPanel, "= 0 ج.م", 1000, yPosition);
+        yPosition += 60;
+
+        // Row 3: Supervisor Barcode Price (خاص بالمشرف فقط)
+        AddLabel(mainPanel, "باركود المشرف:", 30, yPosition);
+        _numSupervisorBarcodePrice = AddNumericUpDown(mainPanel, 200, yPosition, 0, 100000, 2);
+        _numSupervisorBarcodePrice.ValueChanged += (s, e) => CalculateTotals();
+        AddCurrencyLabel(mainPanel, "ج.م", 420, yPosition);
+        _lblSupervisorBarcodeNote = AddCalculatedLabel(mainPanel, "⚠️ سعر خاص بالمشرف فقط", 490, yPosition);
+        _lblSupervisorBarcodeNote.ForeColor = Color.FromArgb(183, 28, 28);
+        _lblSupervisorBarcodeNote.Font = new Font("Cairo", 9F, FontStyle.Bold);
         yPosition += 80;
         
         // ══════════════════════════════════════════════════════════════
@@ -875,15 +906,19 @@ public partial class AddEditUmrahPackageForm : Form
     {
         int currentCount = (int)_numPersons.Value;
         
-        // Save current data
-        var currentData = new List<(string name, string roomType, string roomNumber)>();
+        // Save current data including IDs
+        var currentData = new List<(string pilgrimNumber, int pilgrimId, string name, string roomType, string roomNumber)>();
         for (int i = 0; i < _dgvPilgrims.Rows.Count; i++)
         {
+            var pilgrimNumberCell = _dgvPilgrims.Rows[i].Cells["PilgrimNumber"].Value;
+            var pilgrimIdCell = _dgvPilgrims.Rows[i].Cells["UmrahPilgrimId"].Value;
             var nameCell = _dgvPilgrims.Rows[i].Cells["Name"].Value;
             var roomTypeCell = _dgvPilgrims.Rows[i].Cells["RoomType"].Value;
             var roomNumberCell = _dgvPilgrims.Rows[i].Cells["SharedRoomNumber"].Value;
             
             currentData.Add((
+                pilgrimNumberCell?.ToString() ?? "",
+                pilgrimIdCell != null && int.TryParse(pilgrimIdCell.ToString(), out int id) ? id : 0,
                 nameCell?.ToString() ?? "",
                 roomTypeCell?.ToString() ?? "",
                 roomNumberCell?.ToString() ?? ""
@@ -895,13 +930,25 @@ public partial class AddEditUmrahPackageForm : Form
         
         for (int i = 0; i < currentCount; i++)
         {
+            string pilgrimNumber = i < currentData.Count ? currentData[i].pilgrimNumber : "";
+            int pilgrimId = i < currentData.Count ? currentData[i].pilgrimId : 0;
             string name = i < currentData.Count ? currentData[i].name : "";
             string roomType = i < currentData.Count && !string.IsNullOrWhiteSpace(currentData[i].roomType) 
                 ? NormalizeRoomType(currentData[i].roomType) 
                 : "ثنائي"; // القيمة الافتراضية بالعربي
             string roomNumber = i < currentData.Count ? currentData[i].roomNumber : "";
             
-            _dgvPilgrims.Rows.Add((i + 1).ToString(), name, roomType, roomNumber);
+            int rowIndex = _dgvPilgrims.Rows.Add();
+            DataGridViewRow row = _dgvPilgrims.Rows[rowIndex];
+            
+            // ✅ الاحتفاظ بالـ IDs
+            row.Cells["PilgrimNumber"].Value = pilgrimNumber;
+            row.Cells["UmrahPilgrimId"].Value = pilgrimId > 0 ? pilgrimId : (object)DBNull.Value;
+            
+            row.Cells["Number"].Value = (i + 1).ToString();
+            row.Cells["Name"].Value = name;
+            row.Cells["RoomType"].Value = roomType;
+            row.Cells["SharedRoomNumber"].Value = roomNumber;
         }
     }
     
@@ -933,46 +980,81 @@ public partial class AddEditUmrahPackageForm : Form
         try
         {
             decimal exchangeRate = _numExchangeRate.Value;
-            decimal visaSAR = _numVisaPriceSAR.Value;
+            decimal visaSAR      = _numVisaPriceSAR.Value;
             decimal fastTrainSAR = _numFastTrainSAR.Value;
-            int numberOfPersons = (int)_numPersons.Value;
-            
-            // Convert SAR to EGP
-            decimal visaEGP = visaSAR * exchangeRate;
-            decimal fastTrainEGP = fastTrainSAR * exchangeRate;
-            
-            _lblVisaEGP.Text = $"= {visaEGP:N2} ج.م";
-            _lblFastTrainEGP.Text = $"= {fastTrainEGP:N2} ج.م";
-            
-            // Total Costs per person
-            decimal totalCosts = visaEGP +
-                                _numAccommodationTotal.Value +
-                                _numBarcodePrice.Value +
-                                _numFlightPrice.Value +
-                                fastTrainEGP +
-                                _numCommission.Value +
-                                _numSupervisorExpenses.Value;
-            
-            _lblTotalCosts.Text = $"{totalCosts:N2} ج.م";
-            
-            // Total Revenue
-            decimal totalRevenue = _numSellingPrice.Value * numberOfPersons;
+            int     busesCount   = (int)_numBusesCount.Value;
+            decimal busPriceSAR  = _numBusPriceSAR.Value;
+            decimal supervisorExpensesSAR = _numSupervisorExpensesSAR.Value;
+            int     numberOfPersons = (int)_numPersons.Value;
+
+            // تحويل SAR → EGP
+            decimal visaEGP        = visaSAR * exchangeRate;
+            decimal fastTrainEGP   = fastTrainSAR * exchangeRate;           // للفرد
+            decimal busEGP         = busPriceSAR * exchangeRate * busesCount; // إجمالي الباصات
+            decimal supervisorEGP  = supervisorExpensesSAR * exchangeRate;  // إجمالي مصاريف المشرف
+
+            _lblVisaEGP.Text       = $"= {visaEGP:N2} ج.م";
+            _lblFastTrainEGP.Text  = $"= {fastTrainEGP:N2} ج.م";
+            _lblBusEGP.Text        = $"= {busEGP:N2} ج.م";
+            _lblSupervisorEGP.Text = $"= {supervisorEGP:N2} ج.م";
+
+            // ══ تكاليف للفرد مباشرة (لا تُضرب في عدد الأفراد) ══
+            decimal perPersonCosts =
+                visaEGP +                         // تأشيرة للفرد
+                _numAccommodationTotal.Value +    // إقامة للفرد
+                _numBarcodePrice.Value +          // باركود للفرد
+                _numFlightPrice.Value +           // طيران للفرد
+                fastTrainEGP +                    // قطار سريع للفرد
+                _numOtherExpenses.Value +         // مصروفات أخرى للفرد
+                _numCommission.Value;             // عمولة للفرد
+
+            // ══ تكاليف مشتركة تُقسَّم على عدد الأفراد ══
+            if (numberOfPersons > 0)
+            {
+                decimal sharedCosts =
+                    busEGP +                              // الباصات (إجمالي ÷ أفراد)
+                    _numGiftsPrice.Value +                // هدايا (إجمالي ÷ أفراد)
+                    supervisorEGP +                       // مصاريف مشرف (إجمالي ÷ أفراد)
+                    _numSupervisorBarcodePrice.Value;     // باركود مشرف (إجمالي ÷ أفراد)
+                perPersonCosts += sharedCosts / numberOfPersons;
+            }
+
+            _lblTotalCosts.Text = $"{perPersonCosts:N2} ج.م";
+
+            // سعر البيع = تكاليف الفرد + هامش الربح
+            decimal profitMarginEGP = _numProfitMarginEGP.Value;
+            decimal sellingPrice    = perPersonCosts + profitMarginEGP;
+            _numSellingPrice.Value  = sellingPrice;
+
+            // إجمالي الإيرادات
+            decimal totalRevenue = sellingPrice * numberOfPersons;
             _lblTotalRevenue.Text = $"{totalRevenue:N2} ج.م";
-            
-            // Net Profit (Total)
-            decimal netProfit = totalRevenue - (totalCosts * numberOfPersons);
-            _lblNetProfit.Text = $"{netProfit:N2} ج.م";
-            _lblNetProfit.ForeColor = netProfit >= 0 ? ColorScheme.Success : Color.FromArgb(211, 47, 47);
-            
-            // Profit Margin
-            decimal profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue * 100) : 0;
-            _lblProfitMargin.Text = $"{profitMargin:N2} %";
-            _lblProfitMargin.ForeColor = profitMargin >= 0 ? ColorScheme.Info : Color.FromArgb(211, 47, 47);
-            
-            // Net Profit Per Person
+
+            // صافي الربح الكلي
+            decimal totalCostsAll = perPersonCosts * numberOfPersons;
+            decimal netProfit     = totalRevenue - totalCostsAll;
+            _lblNetProfit.Text    = netProfit >= 0
+                ? $"{netProfit:N0} ج.م"
+                : $"({Math.Abs(netProfit):N0}) خسارة";
+            _lblNetProfit.ForeColor = netProfit >= 0
+                ? ColorScheme.Success
+                : Color.FromArgb(211, 47, 47);
+
+            // نسبة هامش الربح
+            decimal profitPct = totalRevenue > 0 ? (netProfit / totalRevenue * 100) : 0;
+            _lblProfitMargin.Text = $"{profitPct:N2} %";
+            _lblProfitMargin.ForeColor = profitPct >= 0
+                ? ColorScheme.Info
+                : Color.FromArgb(211, 47, 47);
+
+            // صافي الربح للفرد
             decimal netProfitPerPerson = numberOfPersons > 0 ? (netProfit / numberOfPersons) : 0;
-            _lblNetProfitPerPerson.Text = $"{netProfitPerPerson:N2} ج.م";
-            _lblNetProfitPerPerson.ForeColor = netProfitPerPerson >= 0 ? Color.FromArgb(76, 175, 80) : Color.FromArgb(211, 47, 47);
+            _lblNetProfitPerPerson.Text = netProfitPerPerson >= 0
+                ? $"{netProfitPerPerson:N0} ج.م"
+                : $"({Math.Abs(netProfitPerPerson):N0}) خسارة";
+            _lblNetProfitPerPerson.ForeColor = netProfitPerPerson >= 0
+                ? Color.FromArgb(76, 175, 80)
+                : Color.FromArgb(211, 47, 47);
         }
         catch
         {
@@ -1038,11 +1120,18 @@ public partial class AddEditUmrahPackageForm : Form
             _numBarcodePrice.Value = package.BarcodePrice;
             _numFlightPrice.Value = package.FlightPrice;
             _numFastTrainSAR.Value = package.FastTrainPriceSAR;
+            _numBusesCount.Value = package.BusesCount;
+            _numBusPriceSAR.Value = package.BusPriceSAR;
+            _numGiftsPrice.Value = package.GiftsPrice;
+            _numOtherExpenses.Value = package.OtherExpenses;
+            _txtOtherExpensesNotes.Text = package.OtherExpensesNotes ?? "";
+            _numProfitMarginEGP.Value = package.ProfitMarginEGP;
             
             _txtBrokerName.Text = package.BrokerName ?? "";
             _txtSupervisorName.Text = package.SupervisorName ?? "";
             _numCommission.Value = package.Commission;
-            _numSupervisorExpenses.Value = package.SupervisorExpenses;
+            _numSupervisorExpensesSAR.Value = package.SupervisorExpensesSAR;
+            _numSupervisorBarcodePrice.Value = package.SupervisorBarcodePrice;
             
             _cmbStatus.SelectedIndex = (int)package.Status - 1;
             _chkIsActive.Checked = package.IsActive;
@@ -1078,6 +1167,10 @@ public partial class AddEditUmrahPackageForm : Form
                     int rowIndex = _dgvPilgrims.Rows.Add();
                     DataGridViewRow row = _dgvPilgrims.Rows[rowIndex];
                     
+                    // ✅ حفظ الـ IDs المخفية
+                    row.Cells["PilgrimNumber"].Value = pilgrim.PilgrimNumber;
+                    row.Cells["UmrahPilgrimId"].Value = pilgrim.UmrahPilgrimId;
+                    
                     row.Cells["Number"].Value = index.ToString();
                     row.Cells["Name"].Value = pilgrim.FullName;
                     row.Cells["RoomType"].Value = roomTypeDisplay; // ✅ القيمة العربية
@@ -1109,6 +1202,13 @@ public partial class AddEditUmrahPackageForm : Form
     {
         try
         {
+            // ✅ إجبار DataGridView على commit أي تعديلات معلقة
+            if (_dgvPilgrims.CurrentCell != null)
+            {
+                _dgvPilgrims.CurrentCell.OwningRow.Selected = false;
+                _dgvPilgrims.EndEdit();
+            }
+            
             // Validation
             if (string.IsNullOrWhiteSpace(_txtPilgrimName.Text))
             {
@@ -1168,11 +1268,18 @@ public partial class AddEditUmrahPackageForm : Form
                 BarcodePrice = _numBarcodePrice.Value,
                 FlightPrice = _numFlightPrice.Value,
                 FastTrainPriceSAR = _numFastTrainSAR.Value,
+                BusesCount = (int)_numBusesCount.Value,
+                BusPriceSAR = _numBusPriceSAR.Value,
+                GiftsPrice = _numGiftsPrice.Value,
+                OtherExpenses = _numOtherExpenses.Value,
+                OtherExpensesNotes = string.IsNullOrWhiteSpace(_txtOtherExpensesNotes.Text) ? null : _txtOtherExpensesNotes.Text.Trim(),
+                ProfitMarginEGP = _numProfitMarginEGP.Value,
                 
                 BrokerName = string.IsNullOrWhiteSpace(_txtBrokerName.Text) ? null : _txtBrokerName.Text.Trim(),
                 SupervisorName = string.IsNullOrWhiteSpace(_txtSupervisorName.Text) ? null : _txtSupervisorName.Text.Trim(),
                 Commission = _numCommission.Value,
-                SupervisorExpenses = _numSupervisorExpenses.Value,
+                SupervisorExpensesSAR = _numSupervisorExpensesSAR.Value,
+                SupervisorBarcodePrice = _numSupervisorBarcodePrice.Value,
                 
                 Status = (PackageStatus)(_cmbStatus.SelectedIndex + 1),
                 IsActive = _chkIsActive.Checked,
@@ -1188,6 +1295,8 @@ public partial class AddEditUmrahPackageForm : Form
             // Add pilgrims from grid
             for (int i = 0; i < _dgvPilgrims.Rows.Count; i++)
             {
+                var pilgrimNumberCell = _dgvPilgrims.Rows[i].Cells["PilgrimNumber"].Value;
+                var pilgrimIdCell = _dgvPilgrims.Rows[i].Cells["UmrahPilgrimId"].Value;
                 var nameCell = _dgvPilgrims.Rows[i].Cells["Name"].Value;
                 var roomTypeCell = _dgvPilgrims.Rows[i].Cells["RoomType"].Value;
                 var roomNumberCell = _dgvPilgrims.Rows[i].Cells["SharedRoomNumber"].Value;
@@ -1198,15 +1307,16 @@ public partial class AddEditUmrahPackageForm : Form
                 
                 if (!string.IsNullOrWhiteSpace(pilgrimName))
                 {
-                    // Generate pilgrim number
-                    string pilgrimNumber = $"UMP-{DateTime.UtcNow.Year}-{package.PackageNumber.Split('-').Last()}-{(i + 1):D2}";
+                    // ✅ استخدام الـ PilgrimNumber الموجود أو توليد واحد جديد
+                    string pilgrimNumber = pilgrimNumberCell?.ToString() ?? 
+                        $"UMP-{DateTime.UtcNow.Year}-{package.PackageNumber.Split('-').Last()}-{(i + 1):D2}";
                     
                     // Convert room type display to enum (handles both Arabic and English)
                     RoomType pilgrimRoomType = GetRoomTypeFromDisplay(roomTypeDisplay);
                     
-                    Console.WriteLine($"🔍 Pilgrim {i+1}: Name={pilgrimName}, DisplayType={roomTypeDisplay}, EnumType={pilgrimRoomType}");
+                    Console.WriteLine($"🔍 Pilgrim {i+1}: Name={pilgrimName}, DisplayType={roomTypeDisplay}, EnumType={pilgrimRoomType}, PilgrimNumber={pilgrimNumber}");
                     
-                    package.Pilgrims.Add(new UmrahPilgrim
+                    var newPilgrim = new UmrahPilgrim
                     {
                         PilgrimNumber = pilgrimNumber,
                         FullName = pilgrimName,
@@ -1218,7 +1328,16 @@ public partial class AddEditUmrahPackageForm : Form
                         RegisteredAt = DateTime.UtcNow,
                         UpdatedAt = DateTime.UtcNow,
                         Status = PilgrimStatus.Registered
-                    });
+                    };
+                    
+                    // ✅ إذا كان في ID موجود، نستخدمه (للتحديث)
+                    if (pilgrimIdCell != null && int.TryParse(pilgrimIdCell.ToString(), out int existingId) && existingId > 0)
+                    {
+                        newPilgrim.UmrahPilgrimId = existingId;
+                        Console.WriteLine($"   ✅ Using existing ID: {existingId}");
+                    }
+                    
+                    package.Pilgrims.Add(newPilgrim);
                 }
             }
             
@@ -1230,7 +1349,17 @@ public partial class AddEditUmrahPackageForm : Form
             if (_packageId.HasValue)
             {
                 package.UmrahPackageId = _packageId.Value;
+                
+                Console.WriteLine($"🔍 [FORM] About to call UpdatePackageAsync");
+                Console.WriteLine($"   - Package ID: {package.UmrahPackageId}");
+                Console.WriteLine($"   - TripName: {package.TripName}");
+                Console.WriteLine($"   - NumberOfPersons: {package.NumberOfPersons}");
+                Console.WriteLine($"   - Pilgrims Count: {package.Pilgrims.Count}");
+                
                 var success = await _umrahService.UpdatePackageAsync(package);
+                
+                Console.WriteLine($"🔍 [FORM] UpdatePackageAsync returned: {success}");
+                
                 if (success)
                 {
                     MessageBox.Show("تم تحديث الحزمة بنجاح!", "نجح", MessageBoxButtons.OK, MessageBoxIcon.Information);

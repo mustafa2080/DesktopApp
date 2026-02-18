@@ -280,15 +280,12 @@ public class TripService : ITripService
                 Type = transport.Type,
                 TransportDate = transport.TransportDate,
                 Route = transport.Route,
-                VehicleModel = transport.VehicleModel,
                 NumberOfVehicles = transport.NumberOfVehicles,
                 SeatsPerVehicle = transport.SeatsPerVehicle,
                 ParticipantsCount = transport.ParticipantsCount,
                 CostPerVehicle = transport.CostPerVehicle,
                 TourLeaderTip = transport.TourLeaderTip,
-                DriverTip = transport.DriverTip,
-                SupplierName = transport.SupplierName,
-                DriverPhone = transport.DriverPhone
+                DriverTip = transport.DriverTip
             });
         }
         
@@ -308,7 +305,6 @@ public class TripService : ITripService
                 ParticipantsCount = accommodation.ParticipantsCount,
                 CostPerRoomPerNight = accommodation.CostPerRoomPerNight,
                 GuideCost = accommodation.GuideCost,
-                DriverTip = accommodation.DriverTip,
                 MealPlan = accommodation.MealPlan,
                 CheckInDate = accommodation.CheckInDate,
                 CheckOutDate = accommodation.CheckOutDate

@@ -132,9 +132,31 @@ public class UmrahProfitabilityReport
     public string TripName { get; set; } = string.Empty;
     public DateTime Date { get; set; }
     public int NumberOfPersons { get; set; }
+    
+    // الإيرادات
     public decimal TotalRevenue { get; set; }
+    
+    // التكاليف التفصيلية
+    public decimal VisaCost { get; set; }
+    public decimal AccommodationCost { get; set; }
+    public decimal BarcodeCost { get; set; }
+    public decimal SupervisorBarcodeCost { get; set; }
+    public decimal FlightCost { get; set; }
+    public decimal FastTrainCost { get; set; }
+    public decimal BusCost { get; set; }
+    public decimal GiftsCost { get; set; }
+    public decimal OtherExpensesCost { get; set; }
+    public decimal BrokerCommission { get; set; }
+    public decimal SupervisorExpenses { get; set; }
+    
+    // الحسابات
     public decimal TotalCosts { get; set; }
     public decimal NetProfit { get; set; }
     public decimal ProfitMargin { get; set; }
     public string Status { get; set; } = string.Empty;
+    
+    // مؤشرات الأداء
+    public decimal RevenuePerPerson => NumberOfPersons > 0 ? TotalRevenue / NumberOfPersons : 0;
+    public decimal CostPerPerson => NumberOfPersons > 0 ? TotalCosts / NumberOfPersons : 0;
+    public decimal ProfitPerPerson => NumberOfPersons > 0 ? NetProfit / NumberOfPersons : 0;
 }

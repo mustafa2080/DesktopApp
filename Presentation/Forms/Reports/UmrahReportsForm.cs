@@ -711,7 +711,7 @@ public partial class UmrahReportsForm : Form
                 package.TotalRevenue,
                 package.TotalCosts * package.NumberOfPersons,
                 package.NetProfit,
-                package.ProfitMargin,
+                package.ProfitMarginPercent,
                 GetStatusArabic(package.Status)
             );
         }
@@ -721,7 +721,12 @@ public partial class UmrahReportsForm : Form
     {
         _profitabilityGrid.Rows.Clear();
         
-        var sortedPackages = packages.OrderByDescending(p => p.NetProfit).ToList();
+        // Sort by profit in memory after fetching from DB
+        var sortedPackages = packages
+            .Select(p => new { Package = p, NetProfit = p.NetProfit })
+            .OrderByDescending(x => x.NetProfit)
+            .Select(x => x.Package)
+            .ToList();
         
         foreach (var package in sortedPackages)
         {
@@ -731,7 +736,7 @@ public partial class UmrahReportsForm : Form
                 package.TotalRevenue,
                 package.TotalCosts * package.NumberOfPersons,
                 package.NetProfit,
-                package.ProfitMargin
+                package.ProfitMarginPercent
             );
         }
     }
@@ -746,9 +751,11 @@ public partial class UmrahReportsForm : Form
         
         UpdateSummaryCard("إجمالي الحزم", totalPackages.ToString());
         UpdateSummaryCard("إجمالي المعتمرين", totalPersons.ToString());
-        UpdateSummaryCard("إجمالي الإيرادات", $"{totalRevenue:N2} ج.م");
-        UpdateSummaryCard("إجمالي التكاليف", $"{totalCosts:N2} ج.م");
-        UpdateSummaryCard("صافي الربح", $"{netProfit:N2} ج.م");
+        UpdateSummaryCard("إجمالي الإيرادات", $"{totalRevenue:N0} ج.م");
+        UpdateSummaryCard("إجمالي التكاليف", $"{totalCosts:N0} ج.م");
+        string profitLabel = netProfit >= 0 ? "صافي الربح" : "صافي الخسارة";
+        string profitValue = netProfit >= 0 ? $"{netProfit:N0} ج.م" : $"({Math.Abs(netProfit):N0}) ج.م";
+        UpdateSummaryCard(profitLabel, profitValue);
     }
     
     private void UpdateSummaryCard(string title, string value)
@@ -940,7 +947,7 @@ public partial class UmrahReportsForm : Form
                 worksheet.Cell(currentRow, 6).Value = package.TotalRevenue;
                 worksheet.Cell(currentRow, 7).Value = package.TotalCosts * package.NumberOfPersons;
                 worksheet.Cell(currentRow, 8).Value = package.NetProfit;
-                worksheet.Cell(currentRow, 9).Value = package.ProfitMargin;
+                worksheet.Cell(currentRow, 9).Value = package.ProfitMarginPercent;
                 worksheet.Cell(currentRow, 10).Value = GetStatusArabic(package.Status);
                 
                 currentRow++;

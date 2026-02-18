@@ -1032,8 +1032,6 @@ public partial class AddEditTripForm : Form
         // مسار النقل (اختياري - يمكن تركه فارغ)
         _transportationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Route", HeaderText = "المسار", Width = 150 });
         
-        _transportationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "VehicleModel", HeaderText = "الموديل", Width = 100 });
-        
         // عمود المقاعد (للقراءة فقط - يتم تحديثه تلقائياً بناءً على نوع السيارة)
         var seatsColumn = new DataGridViewTextBoxColumn 
         { 
@@ -1075,9 +1073,6 @@ public partial class AddEditTripForm : Form
             DefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(255, 248, 220) }
         };
         _transportationGrid.Columns.Add(costPerPersonCol);
-        
-        _transportationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "SupplierName", HeaderText = "المورد", Width = 100 });
-        _transportationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "DriverPhone", HeaderText = "هاتف السائق", Width = 100 });
         
         // ✅ إضافة معالج أخطاء للـ DataGridView لمنع أخطاء الترتيب
         _transportationGrid.DataError += (s, e) =>
@@ -1151,16 +1146,13 @@ public partial class AddEditTripForm : Form
             "أتوبيس",                              // النوع
             DateTime.Now.ToString("yyyy-MM-dd"),  // التاريخ
             "",                                    // المسار
-            "",                                    // الموديل
             50,                                    // المقاعد (تلقائي بناءً على النوع)
             1,                                     // ✅ عدد المركبات
             0,                                     // عدد الأفراد
             0,                                     // التكلفة الإجمالية
             0,                                     // إكرامية التور ليدر
             0,                                     // إكرامية السواق
-            "0.00",                               // السعر/فرد (محسوب)
-            "",                                    // المورد
-            ""                                     // هاتف السائق
+            "0.00"                                 // السعر/فرد (محسوب)
         );
         _contentPanel.Controls.Add(_addTransportButton);
         
@@ -1318,9 +1310,6 @@ public partial class AddEditTripForm : Form
         // عمود إقامة المرشد
         _accommodationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "GuideCost", HeaderText = "إقامة المرشد", Width = 90 });
         
-        // عمود إكرامية السواق
-        _accommodationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "DriverTip", HeaderText = "إكرامية السواق", Width = 90 });
-        
         // عمود إقامة المرشد/فرد (محسوب)
         _accommodationGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "GuideCostPerPerson", HeaderText = "المرشد/فرد", Width = 80, ReadOnly = true });
         
@@ -1403,7 +1392,6 @@ public partial class AddEditTripForm : Form
                 1.0,                                   // سعر الصرف
                 0,                                     // سعر الليلة
                 0,                                     // إقامة المرشد
-                0,                                     // إكرامية السواق
                 0,                                     // المرشد/فرد (محسوب)
                 "BB",                                  // الوجبات
                 0                                      // الإجمالي (محسوب)
@@ -2161,15 +2149,12 @@ public partial class AddEditTripForm : Form
                             Type = type,
                             TransportDate = transportDate,
                             Route = route,
-                            VehicleModel = row.Cells["VehicleModel"].Value?.ToString(),
                             NumberOfVehicles = numberOfVehicles,
                             SeatsPerVehicle = Convert.ToInt32(row.Cells["SeatsPerVehicle"].Value ?? 50),
                             ParticipantsCount = Convert.ToInt32(row.Cells["ParticipantsCount"].Value ?? 0),
                             CostPerVehicle = costPerVehicle,
                             TourLeaderTip = tourLeaderTip,
                             DriverTip = driverTip,
-                            SupplierName = row.Cells["SupplierName"].Value?.ToString(),
-                            DriverPhone = row.Cells["DriverPhone"].Value?.ToString(),
                             
                             // ✅ حفظ معلومات المزار والبرنامج في الحقول الجديدة
                             VisitName = visitName,
@@ -2262,7 +2247,6 @@ public partial class AddEditTripForm : Form
                             ExchangeRate = exchangeRate, // ✅ حفظ سعر الصرف
                             CostPerRoomPerNight = pricePerNightInEGP, // ✅ حفظ السعر بالجنيه المصري
                             GuideCost = Convert.ToDecimal(row.Cells["GuideCost"].Value ?? 0), // ✅ حفظ تكلفة إقامة المرشد
-                            DriverTip = Convert.ToDecimal(row.Cells["DriverTip"].Value ?? 0), // ✅ حفظ إكرامية السواق
                             MealPlan = row.Cells["MealPlan"].Value?.ToString(),
                             CheckInDate = _startDatePicker?.Value ?? DateTime.Now,
                             CheckOutDate = _endDatePicker?.Value ?? DateTime.Now
@@ -2549,16 +2533,13 @@ public partial class AddEditTripForm : Form
                 typeText,                                      // النوع
                 transport.TransportDate?.ToString("yyyy-MM-dd") ?? "", // التاريخ
                 transport.Route ?? "",                         // المسار
-                transport.VehicleModel ?? "",                  // الموديل
                 transport.SeatsPerVehicle,                    // المقاعد
                 transport.NumberOfVehicles,                   // عدد المركبات
                 transport.ParticipantsCount,                  // عدد الأفراد
                 transport.CostPerVehicle,                     // التكلفة الإجمالية
                 transport.TourLeaderTip,                      // إكرامية التور ليدر
                 transport.DriverTip,                          // إكرامية السواق
-                costPerPerson.ToString("N2"),                 // السعر/فرد
-                transport.SupplierName ?? "",                 // المورد
-                transport.DriverPhone ?? ""                   // هاتف السائق
+                costPerPerson.ToString("N2")                  // السعر/فرد
             );
         }
         
@@ -2620,7 +2601,7 @@ public partial class AddEditTripForm : Form
             var priceInOriginalCurrency = acc.CostPerRoomPerNight / exchangeRate;
             
             // Grid columns order: Date, Type, HotelName, Rating, CruiseLevel, RoomType, 
-            // NumberOfRooms, NumberOfNights, ParticipantsCount, Currency, ExchangeRate, PricePerNight, GuideCost, DriverTip,
+            // NumberOfRooms, NumberOfNights, ParticipantsCount, Currency, ExchangeRate, PricePerNight, GuideCost,
             // GuideCostPerPerson, MealPlan, TotalCost
             _accommodationGrid.Rows.Add(new object?[]
             {
@@ -2637,7 +2618,6 @@ public partial class AddEditTripForm : Form
                 exchangeRate.ToString("N2"),            // ✅ ExchangeRate
                 priceInOriginalCurrency.ToString("N2"), // PricePerNight (in original currency)
                 acc.GuideCost,                           // ✅ GuideCost
-                acc.DriverTip,                           // ✅ DriverTip
                 guideCostPerPerson.ToString("N2"),       // GuideCostPerPerson (calculated)
                 acc.MealPlan ?? "BB",                    // MealPlan
                 totalCost.ToString("N2")                 // TotalCost (calculated)
@@ -2987,16 +2967,13 @@ public partial class AddEditTripForm : Form
                     typeText,                                      // النوع
                     transport.TransportDate?.ToString("yyyy-MM-dd") ?? "", // التاريخ
                     transport.Route ?? "",                         // المسار
-                    transport.VehicleModel ?? "",                  // الموديل
                     transport.SeatsPerVehicle,                    // المقاعد
                     transport.NumberOfVehicles,                   // ✅ عدد المركبات
                     transport.ParticipantsCount,                  // عدد الأفراد
                     transport.CostPerVehicle,                     // التكلفة الإجمالية
                     transport.TourLeaderTip,                      // إكرامية التور ليدر
                     transport.DriverTip,                          // إكرامية السواق
-                    costPerPerson.ToString("N2"),                 // السعر/فرد
-                    transport.SupplierName ?? "",                 // المورد
-                    transport.DriverPhone ?? ""                   // هاتف السائق
+                    costPerPerson.ToString("N2")                  // السعر/فرد
                 );
             }
         }
@@ -3181,7 +3158,7 @@ public partial class AddEditTripForm : Form
         }
         
         // حساب التكاليف عند تغيير أي من القيم
-        var columnsToWatch = new[] { "NumberOfRooms", "NumberOfNights", "ParticipantsCount", "PricePerNight", "GuideCost", "DriverTip", "Currency", "ExchangeRate" };
+        var columnsToWatch = new[] { "NumberOfRooms", "NumberOfNights", "ParticipantsCount", "PricePerNight", "GuideCost", "Currency", "ExchangeRate" };
         var columnName = _accommodationGrid.Columns[e.ColumnIndex].Name;
         
         if (columnsToWatch.Contains(columnName))
@@ -3193,7 +3170,6 @@ public partial class AddEditTripForm : Form
                 var participantsCount = decimal.TryParse(row.Cells["ParticipantsCount"].Value?.ToString(), out var pc) && pc > 0 ? pc : 1;
                 var pricePerNight = decimal.TryParse(row.Cells["PricePerNight"].Value?.ToString(), out var ppn) ? ppn : 0;
                 var guideCost = decimal.TryParse(row.Cells["GuideCost"].Value?.ToString(), out var gc) ? gc : 0;
-                var driverTip = decimal.TryParse(row.Cells["DriverTip"].Value?.ToString(), out var dt) ? dt : 0;
                 var exchangeRate = decimal.TryParse(row.Cells["ExchangeRate"].Value?.ToString(), out var er) ? er : 1;
                 
                 // حساب إقامة المرشد/فرد
@@ -3201,7 +3177,7 @@ public partial class AddEditTripForm : Form
                 row.Cells["GuideCostPerPerson"].Value = guideCostPerPerson.ToString("N2");
                 
                 // حساب التكلفة الإجمالية بالعملة الأجنبية
-                var totalCostInForeignCurrency = (numberOfRooms * numberOfNights * pricePerNight) + guideCost + driverTip;
+                var totalCostInForeignCurrency = (numberOfRooms * numberOfNights * pricePerNight) + guideCost;
                 
                 // تحويل التكلفة للجنيه المصري
                 var totalCostInEGP = totalCostInForeignCurrency * exchangeRate;
@@ -3375,25 +3351,48 @@ public partial class AddEditTripForm : Form
                         {
                             Console.WriteLine($"[PopulateTransportationFromVisits] 🔄 استعادة بيانات موجودة لـ {visitName}");
                             
-                            var typeValue = existingRow.Cells["Type"].Value?.ToString() ?? "أتوبيس";
-                            
-                            _transportationGrid.Rows.Add(
-                                visitName,                                     // اسم المزار
-                                dayNumber,                                     // رقم اليوم
-                                typeValue,                                     // النوع
-                                existingRow.Cells["TransportDate"].Value ?? dayDate.ToString("yyyy-MM-dd"),
-                                existingRow.Cells["Route"].Value ?? $"نقل إلى {visitName}",
-                                existingRow.Cells["VehicleModel"].Value,
-                                existingRow.Cells["SeatsPerVehicle"].Value,
-                                existingRow.Cells["NumberOfVehicles"].Value,
-                                existingRow.Cells["ParticipantsCount"].Value,
-                                existingRow.Cells["CostPerVehicle"].Value,
-                                existingRow.Cells["TourLeaderTip"].Value,
-                                existingRow.Cells["DriverTip"].Value,
-                                existingRow.Cells["CostPerPerson"].Value,
-                                existingRow.Cells["SupplierName"].Value,
-                                existingRow.Cells["DriverPhone"].Value
-                            );
+                            // استخدام try-catch للتعامل مع أي مشاكل في قراءة القيم
+                            try
+                            {
+                                var typeValue = existingRow.Cells.Cast<DataGridViewCell>().Any(c => c.OwningColumn.Name == "Type") && existingRow.Cells["Type"].Value != null
+                                    ? existingRow.Cells["Type"].Value.ToString()
+                                    : "أتوبيس";
+                                
+                                _transportationGrid.Rows.Add(
+                                    visitName,                                     // اسم المزار
+                                    dayNumber,                                     // رقم اليوم
+                                    typeValue,                                     // النوع
+                                    existingRow.Cells["TransportDate"].Value ?? dayDate.ToString("yyyy-MM-dd"),
+                                    existingRow.Cells["Route"].Value ?? $"نقل إلى {visitName}",
+                                    existingRow.Cells["VehicleModel"].Value,
+                                    existingRow.Cells["SeatsPerVehicle"].Value,
+                                    existingRow.Cells["NumberOfVehicles"].Value,
+                                    existingRow.Cells["ParticipantsCount"].Value,
+                                    existingRow.Cells["CostPerVehicle"].Value,
+                                    existingRow.Cells["TourLeaderTip"].Value,
+                                    existingRow.Cells["DriverTip"].Value,
+                                    existingRow.Cells["CostPerPerson"].Value
+                                );
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"[PopulateTransportationFromVisits] ⚠️ خطأ في استعادة البيانات: {ex.Message}");
+                                // في حالة الفشل، نضيف صف جديد بقيم افتراضية
+                                _transportationGrid.Rows.Add(
+                                    visitName,                              // اسم المزار
+                                    dayNumber,                              // رقم اليوم
+                                    "أتوبيس",                              // النوع الافتراضي
+                                    dayDate.ToString("yyyy-MM-dd"),        // تاريخ اليوم
+                                    $"نقل إلى {visitName}",               // المسار
+                                    50,                                    // عدد المقاعد
+                                    1,                                     // عدد المركبات
+                                    program.ParticipantsCount,             // عدد الأفراد
+                                    0,                                     // التكلفة
+                                    0,                                     // إكرامية التور ليدر
+                                    0,                                     // إكرامية السواق
+                                    "0.00"                                 // السعر/فرد
+                                );
+                            }
                         }
                         else
                         {
@@ -3406,16 +3405,13 @@ public partial class AddEditTripForm : Form
                                 "أتوبيس",                              // النوع الافتراضي
                                 dayDate.ToString("yyyy-MM-dd"),        // تاريخ اليوم
                                 $"نقل إلى {visitName}",               // المسار (افتراضي)
-                                "",                                    // الموديل (فارغ)
                                 50,                                    // عدد المقاعد (افتراضي للأتوبيس)
                                 1,                                     // عدد المركبات (افتراضي)
                                 program.ParticipantsCount,             // ✨ عدد الأفراد من البرنامج
                                 0,                                     // التكلفة الإجمالية (فارغ للتعبئة)
                                 0,                                     // إكرامية التور ليدر (فارغ)
                                 0,                                     // إكرامية السواق (فارغ)
-                                "0.00",                               // السعر/فرد (محسوب)
-                                "",                                    // المورد (فارغ)
-                                ""                                     // هاتف السائق (فارغ)
+                                "0.00"                                 // السعر/فرد (محسوب)
                             );
                         }
                         

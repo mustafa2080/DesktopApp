@@ -4,6 +4,7 @@ using GraceWay.AccountingSystem.Presentation.Forms;
 using GraceWay.AccountingSystem.Application.Services;
 using GraceWay.AccountingSystem.Infrastructure.Data;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 
 namespace GraceWay.AccountingSystem.Presentation.Forms;
 
@@ -767,118 +768,112 @@ public partial class MainForm : Form
     {
         _contentPanel?.Controls.Clear();
         
-        // Create TabControl for Accounting Reports
-        var tabControl = new TabControl
+        try
         {
-            Dock = DockStyle.Fill,
-            Font = new Font("Cairo", 11F, FontStyle.Bold),
-            RightToLeftLayout = true
-        };
-        
-        var dbContextFactory = _serviceProvider.GetRequiredService<Microsoft.EntityFrameworkCore.IDbContextFactory<Infrastructure.Data.AppDbContext>>();
-        var exportService = _serviceProvider.GetRequiredService<IExportService>();
-        
-        // Tab 1: Trial Balance
-        var trialBalanceTab = new TabPage("⚖️ ميزان المراجعة");
-        var exportService1 = _serviceProvider.GetRequiredService<IExportService>();
-        var trialBalanceForm = new TrialBalanceReportForm(dbContextFactory, exportService1)
+            // Create TabControl for Accounting Reports
+            var tabControl = new TabControl
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Cairo", 11F, FontStyle.Bold),
+                RightToLeftLayout = true
+            };
+
+            // ✅ Define tabs as (title, loader) pairs - forms load ONLY when tab is clicked
+            var tabDefinitions = new List<(string Title, Func<Control> Loader)>
+            {
+                ("⚖️ ميزان المراجعة", () => {
+                    var f = _serviceProvider.GetRequiredService<IDbContextFactory<Infrastructure.Data.AppDbContext>>();
+                    var e = _serviceProvider.GetRequiredService<IExportService>();
+                    return new TrialBalanceReportForm(f, e) { TopLevel=false, FormBorderStyle=FormBorderStyle.None, Dock=DockStyle.Fill };
+                }),
+                ("📊 قائمة الدخل", () => {
+                    var f = _serviceProvider.GetRequiredService<IDbContextFactory<Infrastructure.Data.AppDbContext>>();
+                    var e = _serviceProvider.GetRequiredService<IExportService>();
+                    return new IncomeStatementForm(f, e) { TopLevel=false, FormBorderStyle=FormBorderStyle.None, Dock=DockStyle.Fill };
+                }),
+                ("💼 الميزانية العمومية", () => {
+                    var f = _serviceProvider.GetRequiredService<IDbContextFactory<Infrastructure.Data.AppDbContext>>();
+                    return new BalanceSheetForm(f) { TopLevel=false, FormBorderStyle=FormBorderStyle.None, Dock=DockStyle.Fill };
+                }),
+                ("💰 تقرير الإيرادات", () => {
+                    var f = _serviceProvider.GetRequiredService<IDbContextFactory<Infrastructure.Data.AppDbContext>>();
+                    return new CashBoxIncomeReportForm(f, _currentUserId) { TopLevel=false, FormBorderStyle=FormBorderStyle.None, Dock=DockStyle.Fill };
+                }),
+                ("💸 تقرير المصروفات", () => {
+                    var f = _serviceProvider.GetRequiredService<IDbContextFactory<Infrastructure.Data.AppDbContext>>();
+                    return new CashBoxExpenseReportForm(f, _currentUserId) { TopLevel=false, FormBorderStyle=FormBorderStyle.None, Dock=DockStyle.Fill };
+                }),
+                ("💰 ربحية الرحلات", () => {
+                    var f = _serviceProvider.GetRequiredService<IDbContextFactory<Infrastructure.Data.AppDbContext>>();
+                    var e = _serviceProvider.GetRequiredService<IExportService>();
+                    return new TripProfitabilityForm(f, e) { TopLevel=false, FormBorderStyle=FormBorderStyle.None, Dock=DockStyle.Fill };
+                }),
+                ("🕌 ربحية العمرة", () => {
+                    var u = _serviceProvider.GetRequiredService<IUmrahService>();
+                    var e = _serviceProvider.GetRequiredService<IExportService>();
+                    return new UmrahProfitabilityReportForm(u, e) { TopLevel=false, FormBorderStyle=FormBorderStyle.None, Dock=DockStyle.Fill };
+                }),
+                ("💳 تقرير دفعات فواتيرك", () => {
+                    var factory = _serviceProvider.GetRequiredService<IDbContextFactory<Infrastructure.Data.AppDbContext>>();
+                    return new FawateerkPaymentsReportForm(factory.CreateDbContext(), _currentUserId) { TopLevel=false, FormBorderStyle=FormBorderStyle.None, Dock=DockStyle.Fill };
+                }),
+            };
+
+            // ✅ Create empty tabs first (instant - no DB calls)
+            foreach (var (title, loader) in tabDefinitions)
+            {
+                var tab = new TabPage(title);
+                tab.Tag = loader; // Store loader function
+                tabControl.TabPages.Add(tab);
+            }
+
+            // ✅ Load FIRST tab immediately (user expects to see something)
+            void LoadTab(TabPage tab)
+            {
+                if (tab.Tag is Func<Control> loaderFn && tab.Controls.Count == 0)
+                {
+                    try
+                    {
+                        var form = loaderFn();
+                        tab.Controls.Add(form);
+                        if (form is Form f) f.Show();
+                        // ✅ Force handle creation and explicit data load for embedded forms
+                        if (form is CashBoxIncomeReportForm incomeForm)
+                            _ = incomeForm.LoadDataExplicitly();
+                        else if (form is CashBoxExpenseReportForm expenseForm)
+                            _ = expenseForm.LoadDataExplicitly();
+                        tab.Tag = null; // Mark as loaded
+                    }
+                    catch (Exception ex)
+                    {
+                        var lbl = new Label { Text = $"خطأ في التحميل: {ex.Message}", Dock = DockStyle.Fill, ForeColor = Color.Red, Font = new Font("Cairo", 10F) };
+                        tab.Controls.Add(lbl);
+                        tab.Tag = null;
+                    }
+                }
+            }
+
+            // Load first tab right away
+            if (tabControl.TabPages.Count > 0)
+                LoadTab(tabControl.TabPages[0]);
+
+            // Load other tabs on demand when selected
+            tabControl.Selected += (s, e) =>
+            {
+                if (e.TabPage != null)
+                    LoadTab(e.TabPage);
+            };
+
+            _contentPanel?.Controls.Add(tabControl);
+        }
+        catch (Exception ex)
         {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            Dock = DockStyle.Fill
-        };
-        trialBalanceTab.Controls.Add(trialBalanceForm);
-        trialBalanceForm.Show();
-        tabControl.TabPages.Add(trialBalanceTab);
-        
-        // Tab 2: Income Statement
-        var incomeTab = new TabPage("📊 قائمة الدخل");
-        var exportService2 = _serviceProvider.GetRequiredService<IExportService>();
-        var incomeForm = new IncomeStatementForm(dbContextFactory, exportService2)
-        {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            Dock = DockStyle.Fill
-        };
-        incomeTab.Controls.Add(incomeForm);
-        incomeForm.Show();
-        tabControl.TabPages.Add(incomeTab);
-        
-        // Tab 3: Balance Sheet
-        var balanceSheetTab = new TabPage("💼 الميزانية العمومية");
-        var balanceSheetForm = new BalanceSheetForm(dbContextFactory)
-        {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            Dock = DockStyle.Fill
-        };
-        balanceSheetTab.Controls.Add(balanceSheetForm);
-        balanceSheetForm.Show();
-        tabControl.TabPages.Add(balanceSheetTab);
-        
-        // Tab 4: CashBox Income Report
-        var cashBoxIncomeTab = new TabPage("💰 تقرير الإيرادات");
-        var cashBoxIncomeForm = new CashBoxIncomeReportForm(dbContextFactory, _currentUserId)
-        {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            Dock = DockStyle.Fill
-        };
-        cashBoxIncomeTab.Controls.Add(cashBoxIncomeForm);
-        cashBoxIncomeForm.Show();
-        tabControl.TabPages.Add(cashBoxIncomeTab);
-        
-        // Tab 5: CashBox Expense Report
-        var cashBoxExpenseTab = new TabPage("💸 تقرير المصروفات");
-        var cashBoxExpenseForm = new CashBoxExpenseReportForm(dbContextFactory, _currentUserId)
-        {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            Dock = DockStyle.Fill
-        };
-        cashBoxExpenseTab.Controls.Add(cashBoxExpenseForm);
-        cashBoxExpenseForm.Show();
-        tabControl.TabPages.Add(cashBoxExpenseTab);
-        
-        // Tab 6: Trip Profitability
-        var tripProfitTab = new TabPage("💰 ربحية الرحلات");
-        var tripProfitForm = new TripProfitabilityForm(dbContextFactory, exportService)
-        {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            Dock = DockStyle.Fill
-        };
-        tripProfitTab.Controls.Add(tripProfitForm);
-        tripProfitForm.Show();
-        tabControl.TabPages.Add(tripProfitTab);
-        
-        // Tab 7: Umrah Profitability
-        var umrahProfitTab = new TabPage("🕌 ربحية العمرة");
-        var umrahService = _serviceProvider.GetRequiredService<IUmrahService>();
-        var umrahProfitForm = new Reports.UmrahProfitabilityReport(umrahService, exportService)
-        {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            Dock = DockStyle.Fill
-        };
-        umrahProfitTab.Controls.Add(umrahProfitForm);
-        umrahProfitForm.Show();
-        tabControl.TabPages.Add(umrahProfitTab);
-        
-        // Tab 8: Fawateerk Payments Report
-        var fawateerkTab = new TabPage("💳 تقرير دفعات فواتيرك");
-        var dbContext = _serviceProvider.GetRequiredService<Infrastructure.Data.AppDbContext>();
-        var fawateerkForm = new FawateerkPaymentsReportForm(dbContext, _currentUserId)
-        {
-            TopLevel = false,
-            FormBorderStyle = FormBorderStyle.None,
-            Dock = DockStyle.Fill
-        };
-        fawateerkTab.Controls.Add(fawateerkForm);
-        fawateerkForm.Show();
-        tabControl.TabPages.Add(fawateerkTab);
-        
-        _contentPanel?.Controls.Add(tabControl);
+            Console.WriteLine($"❌ Error showing accounting reports: {ex.Message}");
+            MessageBox.Show($"حدث خطأ عند فتح التقارير المحاسبية: {ex.Message}", "خطأ",
+                MessageBoxButtons.OK, MessageBoxIcon.Error,
+                MessageBoxDefaultButton.Button1,
+                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+        }
     }
 
     private void ShowCalculator()

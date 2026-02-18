@@ -181,8 +181,9 @@ public class UmrahService : IUmrahService
 
             Console.WriteLine($"🔄 Starting UpdatePackageAsync for package ID: {package.UmrahPackageId}");
             
+            // ✅ استخدام AsTracking لإجبار EF على تتبع التغييرات (لأن الـ context بيستخدم NoTracking)
             var existing = await _context.UmrahPackages
-                .Include(p => p.Pilgrims)
+                .AsTracking() // ✅ مهم جداً! 
                 .FirstOrDefaultAsync(p => p.UmrahPackageId == package.UmrahPackageId);
             
             if (existing == null)
@@ -191,15 +192,14 @@ public class UmrahService : IUmrahService
                 return false;
             }
 
-            // ✅ السماح للجميع بالتعديل (بدون تحقق من اليوزر)
-            Console.WriteLine($"✅ Found existing package. Current pilgrims count: {existing.Pilgrims.Count}");
+            Console.WriteLine($"✅ Found existing package");
             Console.WriteLine($"📊 Package before update:");
             Console.WriteLine($"   - TripName: {existing.TripName}");
             Console.WriteLine($"   - NumberOfPersons: {existing.NumberOfPersons}");
             Console.WriteLine($"   - MakkahHotel: {existing.MakkahHotel}");
             Console.WriteLine($"   - SellingPrice: {existing.SellingPrice}");
             
-            // تحديث البيانات
+            // تحديث البيانات الأساسية
             existing.Date = package.Date;
             existing.TripName = package.TripName;
             existing.NumberOfPersons = package.NumberOfPersons;
@@ -214,16 +214,23 @@ public class UmrahService : IUmrahService
             existing.SARExchangeRate = package.SARExchangeRate;
             existing.AccommodationTotal = package.AccommodationTotal;
             existing.BarcodePrice = package.BarcodePrice;
+            existing.SupervisorBarcodePrice = package.SupervisorBarcodePrice;
             existing.FlightPrice = package.FlightPrice;
             existing.FastTrainPriceSAR = package.FastTrainPriceSAR;
+            existing.BusesCount = package.BusesCount;
+            existing.BusPriceSAR = package.BusPriceSAR;
+            existing.GiftsPrice = package.GiftsPrice;
+            existing.OtherExpenses = package.OtherExpenses;
+            existing.OtherExpensesNotes = package.OtherExpensesNotes;
+            existing.ProfitMarginEGP = package.ProfitMarginEGP;
             existing.BrokerName = package.BrokerName;
             existing.SupervisorName = package.SupervisorName;
             existing.Commission = package.Commission;
-            existing.SupervisorExpenses = package.SupervisorExpenses;
+            existing.SupervisorExpensesSAR = package.SupervisorExpensesSAR;
             existing.Status = package.Status;
             existing.IsActive = package.IsActive;
             existing.Notes = package.Notes;
-            existing.UpdatedBy = currentUser.UserId; // ✅ استخدام اليوزر الحالي بدلاً من package.UpdatedBy
+            existing.UpdatedBy = currentUser.UserId;
             existing.UpdatedAt = DateTime.UtcNow;
             
             Console.WriteLine($"✅ Package data updated - UpdatedBy set to: {currentUser.UserId}");
@@ -233,35 +240,36 @@ public class UmrahService : IUmrahService
             Console.WriteLine($"   - MakkahHotel: {existing.MakkahHotel}");
             Console.WriteLine($"   - SellingPrice: {existing.SellingPrice}");
             
-            // ✅ إجبار EF على تتبع التغييرات
-            _context.Entry(existing).State = EntityState.Modified;
-            Console.WriteLine($"✅ Entity state set to Modified");
+            // ✅ التحقق من حالة الـ Entity
+            var entityState = _context.Entry(existing).State;
+            Console.WriteLine($"📊 Entity State before SaveChanges: {entityState}");
             
-            // Update pilgrims if provided
+            // ✅ حفظ التغييرات الأساسية أولاً
+            var rowsAffected = await _context.SaveChangesAsync();
+            Console.WriteLine($"✅ Basic package data saved - Rows affected: {rowsAffected}");
+            
+            // ✅ تحديث الـ Pilgrims في عملية منفصلة لتجنب مشاكل الـ tracking
             if (package.Pilgrims != null && package.Pilgrims.Any())
             {
                 Console.WriteLine($"🔄 Updating pilgrims. New count: {package.Pilgrims.Count}");
                 
-                // Remove old pilgrims completely
-                if (existing.Pilgrims.Any())
+                // حذف كل الـ pilgrims القديمة مرة واحدة
+                var oldPilgrims = await _context.UmrahPilgrims
+                    .Where(p => p.UmrahPackageId == existing.UmrahPackageId)
+                    .ToListAsync();
+                
+                if (oldPilgrims.Any())
                 {
-                    Console.WriteLine($"🗑️ Removing {existing.Pilgrims.Count} old pilgrims");
-                    var oldPilgrims = existing.Pilgrims.ToList(); // Create a copy to avoid collection modification
-                    foreach (var oldPilgrim in oldPilgrims)
-                    {
-                        _context.UmrahPilgrims.Remove(oldPilgrim);
-                    }
-                    existing.Pilgrims.Clear();
-                    
-                    // Save removal changes first
+                    Console.WriteLine($"🗑️ Removing {oldPilgrims.Count} old pilgrims");
+                    _context.UmrahPilgrims.RemoveRange(oldPilgrims);
                     await _context.SaveChangesAsync();
-                    Console.WriteLine($"✅ Old pilgrims removed and changes saved");
+                    Console.WriteLine($"✅ Old pilgrims removed");
                 }
                 
-                // Now add new pilgrims with fresh state
+                // إضافة الـ pilgrims الجديدة
+                var newPilgrims = new List<UmrahPilgrim>();
                 foreach (var pilgrim in package.Pilgrims)
                 {
-                    // Create a completely new pilgrim entity
                     var newPilgrim = new UmrahPilgrim
                     {
                         UmrahPackageId = existing.UmrahPackageId,
@@ -276,18 +284,19 @@ public class UmrahService : IUmrahService
                         UpdatedAt = DateTime.UtcNow,
                         Status = pilgrim.Status
                     };
-                    
-                    existing.Pilgrims.Add(newPilgrim);
-                    Console.WriteLine($"➕ Added pilgrim: {newPilgrim.FullName}");
+                    newPilgrims.Add(newPilgrim);
+                    Console.WriteLine($"➕ Prepared pilgrim: {newPilgrim.FullName}, RoomType: {newPilgrim.RoomType}");
                 }
                 
-                Console.WriteLine($"✅ All {package.Pilgrims.Count} new pilgrims prepared");
+                if (newPilgrims.Any())
+                {
+                    await _context.UmrahPilgrims.AddRangeAsync(newPilgrims);
+                    await _context.SaveChangesAsync();
+                    Console.WriteLine($"✅ All {newPilgrims.Count} new pilgrims saved");
+                }
             }
             
-            Console.WriteLine($"💾 Saving changes to database...");
-            var result = await _context.SaveChangesAsync();
-            Console.WriteLine($"✅ Successfully saved! Rows affected: {result}");
-            
+            Console.WriteLine($"✅ UpdatePackageAsync completed successfully!");
             return true;
         }
         catch (Exception ex)
@@ -311,6 +320,7 @@ public class UmrahService : IUmrahService
                 throw new UnauthorizedAccessException("لا يوجد مستخدم مسجل");
 
             var package = await _context.UmrahPackages
+                .AsTracking() // ✅ مهم للحذف
                 .FirstOrDefaultAsync(p => p.UmrahPackageId == packageId);
             
             if (package == null)
@@ -433,6 +443,7 @@ public class UmrahService : IUmrahService
         try
         {
             var package = await _context.UmrahPackages
+                .AsTracking() // ✅ مهم للتحديث
                 .FirstOrDefaultAsync(p => p.UmrahPackageId == packageId);
             
             if (package == null)
@@ -472,7 +483,7 @@ public class UmrahService : IUmrahService
             TotalRevenue = packages.Sum(p => p.TotalRevenue),
             TotalCosts = packages.Sum(p => p.TotalCosts * p.NumberOfPersons),
             TotalProfit = packages.Sum(p => p.NetProfit),
-            AverageProfitMargin = packages.Any() ? packages.Average(p => p.ProfitMargin) : 0
+            AverageProfitMargin = packages.Any() ? packages.Average(p => p.ProfitMarginEGP) : 0
         };
         
         // توزيع حسب نوع الغرفة
@@ -515,22 +526,51 @@ public class UmrahService : IUmrahService
         }
         
         var packages = await query
-            .OrderByDescending(p => p.NetProfit)
+            .OrderBy(p => p.Date)
             .ToListAsync();
         
-        return packages.Select(p => new UmrahProfitabilityReport
-        {
-            PackageId = p.UmrahPackageId,
-            PackageNumber = p.PackageNumber,
-            TripName = p.TripName,
-            Date = p.Date,
-            NumberOfPersons = p.NumberOfPersons,
-            TotalRevenue = p.TotalRevenue,
-            TotalCosts = p.TotalCosts * p.NumberOfPersons,
-            NetProfit = p.NetProfit,
-            ProfitMargin = p.ProfitMargin,
-            Status = p.GetStatusDisplay()
-        }).ToList();
+        return packages
+            .OrderByDescending(p => p.NetProfit)
+            .Select(p => new UmrahProfitabilityReport
+            {
+                PackageId = p.UmrahPackageId,
+                PackageNumber = p.PackageNumber,
+                TripName = p.TripName,
+                Date = p.Date,
+                NumberOfPersons = p.NumberOfPersons,
+                
+                // الإيرادات
+                TotalRevenue = p.TotalRevenue,
+                
+                // التكاليف التفصيلية
+                VisaCost = p.VisaPriceEGP * p.NumberOfPersons,
+                AccommodationCost = p.AccommodationTotal * p.NumberOfPersons,
+                BarcodeCost = p.BarcodePrice * p.NumberOfPersons,
+                SupervisorBarcodeCost = p.SupervisorBarcodePrice,
+                FlightCost = p.FlightPrice * p.NumberOfPersons,
+                FastTrainCost = p.FastTrainPriceEGP * p.NumberOfPersons,
+                BusCost = p.BusPriceEGP,
+                GiftsCost = p.GiftsPrice,
+                OtherExpensesCost = p.OtherExpenses * p.NumberOfPersons,
+                BrokerCommission = p.Commission,
+                SupervisorExpenses = p.SupervisorExpensesEGP,
+                
+                // الحسابات - مجموع كل التكاليف الفعلية
+                TotalCosts = (p.VisaPriceEGP * p.NumberOfPersons) + 
+                            (p.AccommodationTotal * p.NumberOfPersons) + 
+                            (p.BarcodePrice * p.NumberOfPersons) + 
+                            p.SupervisorBarcodePrice +
+                            (p.FlightPrice * p.NumberOfPersons) + 
+                            (p.FastTrainPriceEGP * p.NumberOfPersons) + 
+                            p.BusPriceEGP + 
+                            p.GiftsPrice + 
+                            (p.OtherExpenses * p.NumberOfPersons) + 
+                            p.Commission + 
+                            p.SupervisorExpensesEGP,
+                NetProfit = p.NetProfit,
+                ProfitMargin = p.ProfitMarginPercent,
+                Status = p.GetStatusDisplay()
+            }).ToList();
     }
 
     private async Task<bool> IsAdminAsync(int userId)
