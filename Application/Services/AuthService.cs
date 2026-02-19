@@ -9,17 +9,18 @@ public class AuthService : IAuthService
 {
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
     private User? _currentUser;
-    private IAuditService? _auditService;
+    private readonly Lazy<IAuditService> _auditService;
 
-    public AuthService(IDbContextFactory<AppDbContext> contextFactory)
+    public AuthService(IDbContextFactory<AppDbContext> contextFactory, Lazy<IAuditService> auditService)
     {
         _contextFactory = contextFactory;
+        _auditService = auditService;
     }
 
-    // Allow setting AuditService after construction to avoid circular dependency
+    // Kept for backward compatibility
     public void SetAuditService(IAuditService auditService)
     {
-        _auditService = auditService;
+        // No-op: Lazy injection is used instead
     }
 
     public User? CurrentUser => _currentUser;
@@ -57,9 +58,9 @@ public class AuthService : IAuthService
             _currentUser = user;
 
             // ✅ Log Login Action
-            if (_auditService != null)
+            if (_auditService.Value != null)
             {
-                await _auditService.LogAsync(
+                await _auditService.Value.LogAsync(
                     AuditAction.Login,
                     "User",
                     user.UserId,
@@ -78,10 +79,10 @@ public class AuthService : IAuthService
 
     public async void Logout()
     {
-        if (_currentUser != null && _auditService != null)
+        if (_currentUser != null && _auditService.Value != null)
         {
             // ✅ Log Logout Action
-            await _auditService.LogAsync(
+            await _auditService.Value.LogAsync(
                 AuditAction.Logout,
                 "User",
                 _currentUser.UserId,

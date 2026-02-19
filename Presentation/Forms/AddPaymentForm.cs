@@ -136,7 +136,7 @@ public partial class AddPaymentForm : Form
             Font = new Font("Cairo", 12F),
             Size = new Size(200, 30),
             Location = new Point(180, yPos),
-            Text = _remainingAmount.ToString("N2")
+            Text = _remainingAmount.ToString("F2")
         };
         mainPanel.Controls.Add(_amountText);
         
@@ -152,7 +152,7 @@ public partial class AddPaymentForm : Form
             Cursor = Cursors.Hand
         };
         fullAmountBtn.FlatAppearance.BorderSize = 0;
-        fullAmountBtn.Click += (s, e) => _amountText.Text = _remainingAmount.ToString("N2");
+        fullAmountBtn.Click += (s, e) => _amountText.Text = _remainingAmount.ToString("F2");
         mainPanel.Controls.Add(fullAmountBtn);
         
         yPos += 50;
@@ -285,7 +285,10 @@ public partial class AddPaymentForm : Form
                 return;
             }
             
-            if (!decimal.TryParse(_amountText.Text, out decimal amount) || amount <= 0)
+            if (!decimal.TryParse(_amountText.Text.Replace(",", ""), 
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out decimal amount) || amount <= 0)
             {
                 MessageBox.Show("برجاء إدخال مبلغ صحيح", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;

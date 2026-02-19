@@ -8,18 +8,22 @@ public class CashBoxService : ICashBoxService
 {
     private readonly IDbContextFactory<AppDbContext> _contextFactory;
     private readonly IAuthService _authService;
-    private IJournalService? _journalService;
+    private readonly Lazy<IJournalService> _journalService;
 
-    public CashBoxService(IDbContextFactory<AppDbContext> contextFactory, IAuthService authService)
+    public CashBoxService(
+        IDbContextFactory<AppDbContext> contextFactory,
+        IAuthService authService,
+        Lazy<IJournalService> journalService)
     {
         _contextFactory = contextFactory;
         _authService = authService;
+        _journalService = journalService;
     }
     
-    // Property injection لتجنب Circular Dependency
+    // Kept for backward compatibility - no longer needed with Lazy injection
     public void SetJournalService(IJournalService journalService)
     {
-        _journalService = journalService;
+        // No-op: Lazy injection is used instead
     }
 
     #region CashBox Management
@@ -176,11 +180,11 @@ public class CashBoxService : ICashBoxService
             
             await _context.SaveChangesAsync();
             
-            if (_journalService != null)
+            if (_journalService.Value != null)
             {
                 try
                 {
-                    await _journalService.CreateCashTransactionJournalEntryAsync(transaction);
+                    await _journalService.Value.CreateCashTransactionJournalEntryAsync(transaction);
                 }
                 catch (Exception ex)
                 {
@@ -252,11 +256,11 @@ public class CashBoxService : ICashBoxService
         
         await _context.SaveChangesAsync();
         
-        if (_journalService != null)
+        if (_journalService.Value != null)
         {
             try
             {
-                await _journalService.CreateCashTransactionJournalEntryAsync(transaction);
+                await _journalService.Value.CreateCashTransactionJournalEntryAsync(transaction);
             }
             catch (Exception ex)
             {

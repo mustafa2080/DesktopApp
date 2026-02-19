@@ -19,6 +19,10 @@ public partial class MainForm : Form
     private Panel? _contentPanel;
     private DashboardControl? _dashboard;
     private System.Windows.Forms.Timer? _heartbeatTimer; // ✅ Heartbeat for session activity
+    private System.Windows.Forms.Timer? _idleTimer;      // 🔒 Auto-lock on idle
+    private System.Windows.Forms.Timer? _autoBackupTimer; // 💾 Auto daily backup
+    private DateTime _lastActivityTime = DateTime.Now;
+    private const int IdleTimeoutMinutes = 30; // قفل تلقائي بعد 30 دقيقة
 
     public MainForm(string userName, int userId, IServiceProvider serviceProvider, string sessionId)
     {
@@ -30,11 +34,97 @@ public partial class MainForm : Form
         InitializeCustomComponents();
         SetupMainLayout();
         
-        // ✅ Start heartbeat timer to update session activity every 60 seconds
+        // ✅ Heartbeat: update session activity every 60 seconds
         _heartbeatTimer = new System.Windows.Forms.Timer();
-        _heartbeatTimer.Interval = 60000; // 60 seconds
+        _heartbeatTimer.Interval = 60000;
         _heartbeatTimer.Tick += (s, e) => SessionManager.Instance.UpdateActivity(_sessionId);
         _heartbeatTimer.Start();
+
+        // 🔒 Idle Timeout: تحقق كل دقيقة إذا كان المستخدم خامل
+        _idleTimer = new System.Windows.Forms.Timer();
+        _idleTimer.Interval = 60000; // كل دقيقة
+        _idleTimer.Tick += IdleTimer_Tick;
+        _idleTimer.Start();
+
+        // تتبع نشاط المستخدم
+        this.MouseMove += ResetIdleTimer;
+        this.KeyDown += ResetIdleTimer;
+
+        // 💾 Auto Backup: تحقق كل ساعة إذا كان يجب عمل backup
+        _autoBackupTimer = new System.Windows.Forms.Timer();
+        _autoBackupTimer.Interval = 3600000; // كل ساعة
+        _autoBackupTimer.Tick += AutoBackupTimer_Tick;
+        _autoBackupTimer.Start();
+    }
+
+    private async void AutoBackupTimer_Tick(object? sender, EventArgs e)
+    {
+        try
+        {
+            // تحقق إذا تم عمل backup اليوم
+            var lastBackupKey = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "GraceWay", "AccountingSystem", "last_autobackup.txt");
+
+            var today = DateTime.Today.ToString("yyyy-MM-dd");
+            
+            if (File.Exists(lastBackupKey) && File.ReadAllText(lastBackupKey).Trim() == today)
+                return; // تم عمل backup اليوم
+
+            Infrastructure.Logging.AppLogger.Info("Starting scheduled auto-backup...");
+            
+            using var scope = _serviceProvider.CreateScope();
+            var backupService = scope.ServiceProvider.GetRequiredService<Application.Services.Backup.IBackupService>();
+            var result = await backupService.CreateAutoBackupAsync();
+
+            if (result.Success)
+            {
+                File.WriteAllText(lastBackupKey, today);
+                Infrastructure.Logging.AppLogger.Info($"Auto-backup completed: {result.BackupFilePath}");
+            }
+            else
+            {
+                Infrastructure.Logging.AppLogger.Warning($"Auto-backup failed: {result.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Infrastructure.Logging.AppLogger.Error("Auto-backup timer error", ex);
+        }
+    }
+
+    private void ResetIdleTimer(object? sender, EventArgs e)
+    {
+        _lastActivityTime = DateTime.Now;
+    }
+
+    private void IdleTimer_Tick(object? sender, EventArgs e)
+    {
+        var idle = DateTime.Now - _lastActivityTime;
+        if (idle.TotalMinutes >= IdleTimeoutMinutes)
+        {
+            _idleTimer?.Stop();
+            _heartbeatTimer?.Stop();
+            LockScreen();
+        }
+    }
+
+    private void LockScreen()
+    {
+        // إخفاء الفورم وإظهار شاشة تسجيل الدخول مع رسالة
+        this.Hide();
+        var authService = _serviceProvider.GetRequiredService<IAuthService>();
+        authService.Logout();
+        SessionManager.Instance.EndSession(_sessionId);
+
+        var lockMsg = MessageBox.Show(
+            $"⏰ تم قفل البرنامج تلقائياً بعد {IdleTimeoutMinutes} دقيقة من عدم النشاط.\n\n" +
+            "أعد تسجيل الدخول للمتابعة.",
+            "تم القفل التلقائي",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Information);
+
+        this.Close();
     }
 
     private void InitializeCustomComponents()
@@ -429,7 +519,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في تحميل إعدادات الشركة: {ex.Message}\n\n{ex.StackTrace}", "خطأ",
+            MessageBox.Show($"خطأ في تحميل إعدادات الشركة: {ex.Message}", "خطأ",
                 MessageBoxButtons.OK, MessageBoxIcon.Error,
                 MessageBoxDefaultButton.Button1,
                 MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
@@ -452,7 +542,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في تحميل إعدادات الفواتير: {ex.Message}\n\n{ex.StackTrace}", "خطأ",
+            MessageBox.Show($"خطأ في تحميل إعدادات الفواتير: {ex.Message}", "خطأ",
                 MessageBoxButtons.OK, MessageBoxIcon.Error,
                 MessageBoxDefaultButton.Button1,
                 MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
@@ -476,7 +566,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في تحميل إعدادات السنة المالية: {ex.Message}\n\n{ex.StackTrace}", "خطأ",
+            MessageBox.Show($"خطأ في تحميل إعدادات السنة المالية: {ex.Message}", "خطأ",
                 MessageBoxButtons.OK, MessageBoxIcon.Error,
                 MessageBoxDefaultButton.Button1,
                 MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
@@ -499,7 +589,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في تحميل إدارة النسخ الاحتياطية: {ex.Message}\n\n{ex.StackTrace}", "خطأ",
+            MessageBox.Show($"خطأ في تحميل إدارة النسخ الاحتياطية: {ex.Message}", "خطأ",
                 MessageBoxButtons.OK, MessageBoxIcon.Error,
                 MessageBoxDefaultButton.Button1,
                 MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
@@ -527,7 +617,7 @@ public partial class MainForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في تحميل إدارة المستخدمين: {ex.Message}\n\n{ex.StackTrace}", 
+            MessageBox.Show($"خطأ في تحميل إدارة المستخدمين: {ex.Message}", 
                 "خطأ",
                 MessageBoxButtons.OK, 
                 MessageBoxIcon.Error,
@@ -972,11 +1062,15 @@ public partial class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        // ✅ Stop heartbeat timer
+        // ✅ Stop all timers
         try
         {
             _heartbeatTimer?.Stop();
             _heartbeatTimer?.Dispose();
+            _idleTimer?.Stop();
+            _idleTimer?.Dispose();
+            _autoBackupTimer?.Stop();
+            _autoBackupTimer?.Dispose();
         }
         catch { }
         

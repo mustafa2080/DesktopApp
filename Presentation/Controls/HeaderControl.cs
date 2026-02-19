@@ -161,119 +161,162 @@ public class HeaderControl : Panel
 
     private Panel CreateQuickStatsSection()
     {
+        // 3 cards × 195px + 2 gaps × 10px = 605px
         Panel panel = new Panel
         {
-            Size = new Size(600, 60), // زيادة العرض والارتفاع
+            Size = new Size(615, 64),
             BackColor = Color.Transparent
         };
 
-        // Stat 1: Today Revenue مع خلفية مميزة
-        var stat1 = CreateQuickStat("💰", "---", "إيرادات اليوم", 0, Color.FromArgb(34, 197, 94), out _lblTodayRevenue);
+        var stat1 = CreateQuickStat("💰", "---", "إيرادات اليوم",
+            0,   Color.FromArgb(16, 185, 129), Color.FromArgb(5, 150, 105),   out _lblTodayRevenue);
+        var stat2 = CreateQuickStat("📄", "---", "فواتير معلقة",
+            205, Color.FromArgb(245, 101, 101), Color.FromArgb(220, 38, 38),  out _lblPendingInvoices);
+        var stat3 = CreateQuickStat("✈️", "---", "حجوزات نشطة",
+            410, Color.FromArgb(96, 165, 250), Color.FromArgb(37, 99, 235),   out _lblActiveReservations);
+
         panel.Controls.Add(stat1);
-
-        // Stat 2: Pending Invoices مع خلفية مميزة
-        var stat2 = CreateQuickStat("📄", "---", "فواتير معلقة", 200, Color.FromArgb(239, 68, 68), out _lblPendingInvoices);
         panel.Controls.Add(stat2);
-
-        // Stat 3: Active Reservations مع خلفية مميزة
-        var stat3 = CreateQuickStat("✈️", "---", "حجوزات نشطة", 400, Color.FromArgb(59, 130, 246), out _lblActiveReservations);
         panel.Controls.Add(stat3);
-
         return panel;
     }
 
-    private Panel CreateQuickStat(string icon, string value, string label, int xPos, Color accentColor, out Label valueLabel)
+    private Panel CreateQuickStat(string icon, string value, string label,
+        int xPos, Color colorTop, Color colorBottom, out Label valueLabel)
     {
-        Panel statPanel = new Panel
+        var card = new Panel
         {
-            Size = new Size(190, 60),
+            Size     = new Size(195, 64),
             Location = new Point(xPos, 0),
-            BackColor = Color.FromArgb(250, 251, 252), // خلفية فاتحة بدلاً من بيضاء تماماً
-            Cursor = Cursors.Hand
+            BackColor = Color.Transparent,
+            Cursor    = Cursors.Hand,
         };
 
-        // رسم border وتأثيرات
-        statPanel.Paint += (s, e) =>
+        bool hovered = false;
+
+        card.Paint += (s, e) =>
         {
             var g = e.Graphics;
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            
-            // خلفية ملونة كاملة بدلاً من شفافة
-            using var bgBrush = new SolidBrush(accentColor);
-            using var bgPath = RoundedRect(new Rectangle(0, 0, statPanel.Width, statPanel.Height), 10);
-            g.FillPath(bgBrush, bgPath);
-            
-            // Border أبيض خفيف للتحديد
-            using var pen = new Pen(Color.FromArgb(80, 255, 255, 255), 2);
-            g.DrawPath(pen, bgPath);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            var rect = new Rectangle(0, 0, card.Width - 1, card.Height - 1);
+            using var path = RoundedRect(rect, 12);
+
+            // Gradient fill
+            var c1 = hovered ? Lighten(colorTop, 18)    : colorTop;
+            var c2 = hovered ? Lighten(colorBottom, 12) : colorBottom;
+            using var grad = new LinearGradientBrush(rect, c1, c2,
+                LinearGradientMode.ForwardDiagonal);
+            g.FillPath(grad, path);
+
+            // Subtle inner-top white sheen
+            using var sheenPath = RoundedRect(new Rectangle(1, 1, card.Width - 3, 28), 11);
+            using var sheenBrush = new SolidBrush(Color.FromArgb(28, 255, 255, 255));
+            g.FillPath(sheenBrush, sheenPath);
+
+            // Thin white border
+            using var pen = new Pen(Color.FromArgb(55, 255, 255, 255), 1.2f);
+            g.DrawPath(pen, path);
+
+            // Bottom glow strip
+            using var stripBrush = new SolidBrush(Color.FromArgb(40, 0, 0, 0));
+            g.FillRectangle(stripBrush, 0, card.Height - 10, card.Width, 10);
         };
 
-        // أيقونة بيضاء كبيرة
+        // Icon box — small rounded square
+        var iconBox = new Panel
+        {
+            Size      = new Size(40, 40),
+            Location  = new Point(card.Width - 50, 12),
+            BackColor = Color.Transparent,
+        };
+        iconBox.Paint += (s, e) =>
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using var p = RoundedRect(new Rectangle(0, 0, 40, 40), 8);
+            using var b = new SolidBrush(Color.FromArgb(55, 255, 255, 255));
+            g.FillPath(b, p);
+        };
+
         var lblIcon = new Label
         {
-            Text = icon,
-            Font = new Font("Segoe UI Emoji", 24F), // أكبر
-            ForeColor = Color.White, // أبيض على الخلفية الملونة
-            AutoSize = true,
-            Location = new Point(10, 15),
-            BackColor = Color.Transparent
+            Text      = icon,
+            Font      = new Font("Segoe UI Emoji", 17F),
+            ForeColor = Color.White,
+            Size      = new Size(40, 40),
+            Location  = new Point(0, 0),
+            TextAlign = ContentAlignment.MiddleCenter,
+            BackColor = Color.Transparent,
         };
-        statPanel.Controls.Add(lblIcon);
+        iconBox.Controls.Add(lblIcon);
+        card.Controls.Add(iconBox);
 
-        // القيمة بيضاء كبيرة وواضحة
+        // Value label
         valueLabel = new Label
         {
-            Text = value,
-            Font = new Font("Cairo", 18F, FontStyle.Bold), // أكبر جداً
-            ForeColor = Color.White, // أبيض واضح
-            AutoSize = true,
-            Location = new Point(55, 10),
-            BackColor = Color.Transparent
+            Text      = value,
+            Font      = new Font("Cairo", 17F, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize  = false,
+            Size      = new Size(130, 32),
+            Location  = new Point(6, 6),
+            TextAlign = ContentAlignment.MiddleRight,
+            BackColor = Color.Transparent,
         };
-        statPanel.Controls.Add(valueLabel);
+        card.Controls.Add(valueLabel);
 
-        // التسمية بيضاء
-        var lblLabel = new Label
+        // Label text
+        var lblText = new Label
         {
-            Text = label,
-            Font = new Font("Cairo", 9F, FontStyle.Regular),
-            ForeColor = Color.FromArgb(230, 255, 255, 255), // أبيض شفاف قليلاً
-            AutoSize = true,
-            Location = new Point(55, 38),
-            BackColor = Color.Transparent
+            Text      = label,
+            Font      = new Font("Cairo", 8.5F, FontStyle.Regular),
+            ForeColor = Color.FromArgb(220, 255, 255, 255),
+            AutoSize  = false,
+            Size      = new Size(130, 20),
+            Location  = new Point(6, 40),
+            TextAlign = ContentAlignment.MiddleRight,
+            BackColor = Color.Transparent,
         };
-        statPanel.Controls.Add(lblLabel);
+        card.Controls.Add(lblText);
 
-        // تأثير hover - تغميق الخلفية
-        statPanel.MouseEnter += (s, e) =>
+        // Hover
+        void SetHover(bool on)
         {
-            // تغميق اللون
-            int r = Math.Max(0, accentColor.R - 30);
-            int g = Math.Max(0, accentColor.G - 30);
-            int b = Math.Max(0, accentColor.B - 30);
-            statPanel.BackColor = Color.FromArgb(r, g, b);
-            statPanel.Invalidate();
-        };
-        statPanel.MouseLeave += (s, e) =>
+            hovered = on;
+            card.Invalidate();
+        }
+        card.MouseEnter += (s, e) => SetHover(true);
+        card.MouseLeave += (s, e) => SetHover(false);
+        foreach (Control c in card.Controls)
         {
-            statPanel.BackColor = Color.FromArgb(250, 251, 252);
-            statPanel.Invalidate();
-        };
+            c.MouseEnter += (s, e) => SetHover(true);
+            c.MouseLeave += (s, e) => SetHover(false);
+        }
+        foreach (Control c in iconBox.Controls)
+        {
+            c.MouseEnter += (s, e) => SetHover(true);
+            c.MouseLeave += (s, e) => SetHover(false);
+        }
 
-        return statPanel;
+        return card;
     }
-    
-    private System.Drawing.Drawing2D.GraphicsPath RoundedRect(Rectangle bounds, int radius)
+
+    private static Color Lighten(Color c, int amount) =>
+        Color.FromArgb(
+            Math.Min(255, c.R + amount),
+            Math.Min(255, c.G + amount),
+            Math.Min(255, c.B + amount));
+
+    private static GraphicsPath RoundedRect(Rectangle bounds, int radius)
     {
-        var path = new System.Drawing.Drawing2D.GraphicsPath();
+        var path = new GraphicsPath();
         int d = radius * 2;
-        
-        path.AddArc(bounds.X, bounds.Y, d, d, 180, 90);
-        path.AddArc(bounds.Right - d, bounds.Y, d, d, 270, 90);
-        path.AddArc(bounds.Right - d, bounds.Bottom - d, d, d, 0, 90);
-        path.AddArc(bounds.X, bounds.Bottom - d, d, d, 90, 90);
+        path.AddArc(bounds.X,              bounds.Y,               d, d, 180, 90);
+        path.AddArc(bounds.Right - d,      bounds.Y,               d, d, 270, 90);
+        path.AddArc(bounds.Right - d,      bounds.Bottom - d,      d, d,   0, 90);
+        path.AddArc(bounds.X,              bounds.Bottom - d,      d, d,  90, 90);
         path.CloseFigure();
-        
         return path;
     }
 
@@ -281,80 +324,34 @@ public class HeaderControl : Panel
     {
         try
         {
-            Console.WriteLine("🔄 Starting LoadHeaderStatsAsync...");
-            
+            // ⚠️ DbContext غير thread-safe - sequential queries
+            var today = DateTime.Today;
+
             if (_reservationService != null)
             {
-                Console.WriteLine("✅ ReservationService found");
-                var today = DateTime.Today;
                 var stats = await _reservationService.GetReservationStatisticsAsync(today, today.AddDays(1));
                 var todayRevenue = stats.GetValueOrDefault("TotalSales", 0m);
-                Console.WriteLine($"💰 Today Revenue: {todayRevenue}");
-                
                 var allReservations = await _reservationService.GetAllReservationsAsync();
                 var activeCount = allReservations?.Count(r => r.Status == "Confirmed" || r.Status == "Pending") ?? 0;
-                Console.WriteLine($"✈️ Active Reservations: {activeCount}");
-
                 SafeUpdateUI(() =>
                 {
-                    if (_lblTodayRevenue != null)
-                    {
-                        _lblTodayRevenue.Text = FormatCurrency(todayRevenue);
-                        Console.WriteLine($"✅ Updated TodayRevenue label: {_lblTodayRevenue.Text}");
-                    }
-                    else
-                    {
-                        Console.WriteLine("❌ _lblTodayRevenue is null!");
-                    }
-                    
-                    if (_lblActiveReservations != null)
-                    {
-                        _lblActiveReservations.Text = activeCount.ToString();
-                        Console.WriteLine($"✅ Updated ActiveReservations label: {_lblActiveReservations.Text}");
-                    }
-                    else
-                    {
-                        Console.WriteLine("❌ _lblActiveReservations is null!");
-                    }
+                    if (_lblTodayRevenue != null) _lblTodayRevenue.Text = FormatCurrency(todayRevenue);
+                    if (_lblActiveReservations != null) _lblActiveReservations.Text = activeCount.ToString();
                 });
-            }
-            else
-            {
-                Console.WriteLine("❌ ReservationService is null!");
             }
 
             if (_invoiceService != null)
             {
-                Console.WriteLine("✅ InvoiceService found");
-                var salesInvoices = await _invoiceService.GetUnpaidSalesInvoicesAsync();
+                var salesInvoices    = await _invoiceService.GetUnpaidSalesInvoicesAsync();
                 var purchaseInvoices = await _invoiceService.GetUnpaidPurchaseInvoicesAsync();
                 var pendingCount = (salesInvoices?.Count ?? 0) + (purchaseInvoices?.Count ?? 0);
-                Console.WriteLine($"📄 Pending Invoices: {pendingCount}");
-
-                SafeUpdateUI(() =>
-                {
-                    if (_lblPendingInvoices != null)
-                    {
-                        _lblPendingInvoices.Text = pendingCount.ToString();
-                        Console.WriteLine($"✅ Updated PendingInvoices label: {_lblPendingInvoices.Text}");
-                    }
-                    else
-                    {
-                        Console.WriteLine("❌ _lblPendingInvoices is null!");
-                    }
-                });
+                SafeUpdateUI(() => { if (_lblPendingInvoices != null) _lblPendingInvoices.Text = pendingCount.ToString(); });
             }
-            else
-            {
-                Console.WriteLine("❌ InvoiceService is null!");
-            }
-            
-            Console.WriteLine("✅ LoadHeaderStatsAsync completed successfully!");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Error loading header stats: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            GraceWay.AccountingSystem.Infrastructure.Logging.AppLogger.Error("Error loading header stats", ex);
         }
     }
 
@@ -536,6 +533,30 @@ public class HeaderControl : Panel
         logoutButton.Click += (s, e) => LogoutClicked?.Invoke(this, EventArgs.Empty);
 
         panel.Controls.Add(logoutButton);
+
+        // About button
+        Button aboutButton = new Button
+        {
+            Text = "ℹ️",
+            Font = new Font("Segoe UI Emoji", 14F),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(52, 152, 219),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(50, 55),
+            Location = new Point(244, 0),
+            Cursor = Cursors.Hand,
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+        aboutButton.FlatAppearance.BorderSize = 0;
+        ToolTip aboutTooltip = new ToolTip();
+        aboutTooltip.SetToolTip(aboutButton, "عن البرنامج");
+        aboutButton.Click += (s, e) =>
+        {
+            using var aboutForm = new GraceWay.AccountingSystem.Presentation.Forms.AboutForm();
+            aboutForm.ShowDialog();
+        };
+        panel.Controls.Add(aboutButton);
+        panel.Width = 305;
 
         // Separator line
         Panel separator = new Panel

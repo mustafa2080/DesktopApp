@@ -198,6 +198,7 @@ public class SidebarControl : Panel
     {
         try
         {
+            // ⚠️ DbContext غير thread-safe - sequential queries
             if (_reservationService != null)
             {
                 var reservations = await _reservationService.GetAllReservationsAsync();
@@ -220,7 +221,7 @@ public class SidebarControl : Panel
             if (_tripService != null)
             {
                 var trips = await _tripService.GetAllTripsAsync();
-                var activeTrips = trips?.Count(t => t.Status == Domain.Entities.TripStatus.Confirmed || 
+                var activeTrips = trips?.Count(t => t.Status == Domain.Entities.TripStatus.Confirmed ||
                                                     t.Status == Domain.Entities.TripStatus.Unconfirmed) ?? 0;
                 UpdateBadge("trips", activeTrips);
             }
@@ -233,7 +234,7 @@ public class SidebarControl : Panel
 
             if (_invoiceService != null)
             {
-                var salesInvoices = await _invoiceService.GetUnpaidSalesInvoicesAsync();
+                var salesInvoices    = await _invoiceService.GetUnpaidSalesInvoicesAsync();
                 var purchaseInvoices = await _invoiceService.GetUnpaidPurchaseInvoicesAsync();
                 var unpaidCount = (salesInvoices?.Count ?? 0) + (purchaseInvoices?.Count ?? 0);
                 UpdateBadge("invoices", unpaidCount);
@@ -291,7 +292,7 @@ public class SidebarControl : Panel
         catch (Exception ex)
         {
             Console.WriteLine($"❌ Error applying permissions: {ex.Message}");
-            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            Infrastructure.Logging.AppLogger.Error("Error applying permissions", ex);
         }
     }
 

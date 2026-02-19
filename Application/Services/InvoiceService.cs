@@ -68,18 +68,37 @@ public class InvoiceService : IInvoiceService
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine($"=== بدء حذف فاتورة مبيعات ID: {id} ===");
             var invoice = await _context.SalesInvoices
                 .FirstOrDefaultAsync(i => i.SalesInvoiceId == id);
                 
             if (invoice == null)
                 return false;
             
-            // حذف الدفعات المرتبطة
+            // جلب الدفعات المرتبطة مع CashTransactionId
             var payments = await _context.InvoicePayments
                 .Where(p => p.SalesInvoiceId == id)
                 .ToListAsync();
+
             if (payments.Any())
             {
+                foreach (var payment in payments)
+                {
+                    // عكس المبلغ من الخزنة - خصم المبلغ اللي كان إيراد
+                    if (payment.CashTransactionId.HasValue)
+                    {
+                        // Soft Delete على حركة الخزنة
+                        await _context.Database.ExecuteSqlRawAsync(
+                            "UPDATE cashtransactions SET isdeleted = true WHERE transactionid = {0}",
+                            payment.CashTransactionId.Value);
+
+                        // تحديث رصيد الخزنة - نطرح المبلغ لأنه كان إيراد
+                        await _context.Database.ExecuteSqlRawAsync(
+                            "UPDATE cashboxes SET currentbalance = currentbalance - {0} WHERE cashboxid = {1}",
+                            payment.Amount, payment.CashBoxId);
+                    }
+                }
+
                 _context.InvoicePayments.RemoveRange(payments);
             }
             
@@ -98,9 +117,10 @@ public class InvoiceService : IInvoiceService
             
             return true;
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            System.Diagnostics.Debug.WriteLine($"=== خطأ حذف مبيعات: {ex.Message} | {ex.InnerException?.Message} ===");
+            throw; // نرمي الخطأ للـ UI عشان نشوفه
         }
     }
 
@@ -195,18 +215,37 @@ public class InvoiceService : IInvoiceService
     {
         try
         {
+            System.Diagnostics.Debug.WriteLine($"=== بدء حذف فاتورة مشتريات ID: {id} ===");
             var invoice = await _context.PurchaseInvoices
                 .FirstOrDefaultAsync(i => i.PurchaseInvoiceId == id);
                 
             if (invoice == null)
                 return false;
             
-            // حذف الدفعات المرتبطة
+            // جلب الدفعات المرتبطة مع CashTransactionId
             var payments = await _context.InvoicePayments
                 .Where(p => p.PurchaseInvoiceId == id)
                 .ToListAsync();
+
             if (payments.Any())
             {
+                foreach (var payment in payments)
+                {
+                    // عكس المبلغ من الخزنة - إضافة المبلغ لأنه كان مصروف
+                    if (payment.CashTransactionId.HasValue)
+                    {
+                        // Soft Delete على حركة الخزنة
+                        await _context.Database.ExecuteSqlRawAsync(
+                            "UPDATE cashtransactions SET isdeleted = true WHERE transactionid = {0}",
+                            payment.CashTransactionId.Value);
+
+                        // تحديث رصيد الخزنة - نضيف المبلغ لأنه كان مصروف
+                        await _context.Database.ExecuteSqlRawAsync(
+                            "UPDATE cashboxes SET currentbalance = currentbalance + {0} WHERE cashboxid = {1}",
+                            payment.Amount, payment.CashBoxId);
+                    }
+                }
+
                 _context.InvoicePayments.RemoveRange(payments);
             }
             
@@ -225,9 +264,10 @@ public class InvoiceService : IInvoiceService
             
             return true;
         }
-        catch
+        catch (Exception ex)
         {
-            return false;
+            System.Diagnostics.Debug.WriteLine($"=== خطأ حذف مشتريات: {ex.Message} | {ex.InnerException?.Message} ===");
+            throw; // نرمي الخطأ للـ UI عشان نشوفه
         }
     }
 
@@ -257,7 +297,9 @@ public class InvoiceService : IInvoiceService
     public async Task<InvoicePayment> AddPaymentAsync(InvoicePayment payment)
     {
         payment.CreatedAt = DateTime.UtcNow;
-        payment.PaymentDate = DateTime.UtcNow;
+        // لا نعمل override على PaymentDate - نحافظ على التاريخ اللي جاء من الفورم
+        if (payment.PaymentDate == default)
+            payment.PaymentDate = DateTime.Now;
         
         // إنشاء حركة في الخزنة
         var transaction = new CashTransaction
@@ -279,42 +321,50 @@ public class InvoiceService : IInvoiceService
         
         // إضافة الدفعة
         _context.InvoicePayments.Add(payment);
-        
-        // تحديث حالة الفاتورة
+        await _context.SaveChangesAsync();
+
+        // تحديث حالة الفاتورة باستخدام SQL مباشر لضمان الحفظ الصحيح
         if (payment.SalesInvoiceId.HasValue)
         {
-            var invoice = await _context.SalesInvoices.FindAsync(payment.SalesInvoiceId.Value);
+            var invoice = await _context.SalesInvoices
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.SalesInvoiceId == payment.SalesInvoiceId.Value);
+
             if (invoice != null)
             {
-                invoice.PaidAmount += payment.Amount;
-                if (invoice.PaidAmount >= invoice.TotalAmount)
-                {
-                    invoice.Status = "Paid";
-                }
-                else if (invoice.PaidAmount > 0)
-                {
-                    invoice.Status = "Partial";
-                }
+                decimal newPaid = invoice.PaidAmount + payment.Amount;
+                string newStatus = newPaid >= invoice.TotalAmount ? "Paid"
+                                 : newPaid > 0 ? "Partial"
+                                 : "Unpaid";
+
+                await _context.Database.ExecuteSqlRawAsync(
+                    @"UPDATE salesinvoices 
+                      SET paidamount = {0}, status = {1} 
+                      WHERE salesinvoiceid = {2}",
+                    newPaid, newStatus, payment.SalesInvoiceId.Value);
             }
         }
         else if (payment.PurchaseInvoiceId.HasValue)
         {
-            var invoice = await _context.PurchaseInvoices.FindAsync(payment.PurchaseInvoiceId.Value);
+            var invoice = await _context.PurchaseInvoices
+                .AsNoTracking()
+                .FirstOrDefaultAsync(i => i.PurchaseInvoiceId == payment.PurchaseInvoiceId.Value);
+
             if (invoice != null)
             {
-                invoice.PaidAmount += payment.Amount;
-                if (invoice.PaidAmount >= invoice.TotalAmount)
-                {
-                    invoice.Status = "Paid";
-                }
-                else if (invoice.PaidAmount > 0)
-                {
-                    invoice.Status = "Partial";
-                }
+                decimal newPaid = invoice.PaidAmount + payment.Amount;
+                string newStatus = newPaid >= invoice.TotalAmount ? "Paid"
+                                 : newPaid > 0 ? "Partial"
+                                 : "Unpaid";
+
+                await _context.Database.ExecuteSqlRawAsync(
+                    @"UPDATE purchaseinvoices 
+                      SET paidamount = {0}, status = {1} 
+                      WHERE purchaseinvoiceid = {2}",
+                    newPaid, newStatus, payment.PurchaseInvoiceId.Value);
             }
         }
-        
-        await _context.SaveChangesAsync();
+
         return payment;
     }
 

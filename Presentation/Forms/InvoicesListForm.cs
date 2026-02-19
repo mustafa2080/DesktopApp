@@ -569,6 +569,8 @@ public partial class InvoicesListForm : Form
             {
                 MessageBox.Show("تم حذف الفاتورة بنجاح", "نجاح",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _salesGrid.Columns.Clear();
+                _purchaseGrid.Columns.Clear();
                 await LoadDataAsync();
             }
             else
@@ -579,7 +581,7 @@ public partial class InvoicesListForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في الحذف: {ex.Message}", "خطأ",
+            MessageBox.Show($"خطأ في الحذف:\n{ex.Message}\n\n{ex.InnerException?.Message}", "خطأ - تفاصيل",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
@@ -660,7 +662,7 @@ public partial class InvoicesListForm : Form
                 purchaseInvoiceId = invoiceId;
             }
             
-            using var paymentForm = new AddPaymentForm(
+            var paymentForm = new AddPaymentForm(
                 _invoiceService,
                 _cashBoxService,
                 _currentUserId,
@@ -670,8 +672,16 @@ public partial class InvoicesListForm : Form
                 invoiceNumber
             );
             
-            paymentForm.Show(); // ✅ تغيير من ShowDialog إلى Show لفتح نوافذ متعددة
-            await LoadDataAsync();
+            paymentForm.FormClosed += async (s, args) =>
+            {
+                paymentForm.Dispose();
+                // إعادة تهيئة الأعمدة لضمان تحديث البيانات من الـ DB
+                _salesGrid.Columns.Clear();
+                _purchaseGrid.Columns.Clear();
+                await LoadDataAsync();
+            };
+            
+            paymentForm.Show();
         }
         catch (Exception ex)
         {

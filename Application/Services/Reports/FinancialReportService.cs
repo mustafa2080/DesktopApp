@@ -115,43 +115,43 @@ public class FinancialReportService : IFinancialReportService
     }
     
     /// <summary>
-    /// حساب المصروفات التشغيلية
+    /// حساب المصروفات التشغيلية - ✅ مُحسَّن بفلترة في SQL
     /// </summary>
     private async Task<OperatingExpenseSection> CalculateOperatingExpensesAsync(
         DateTime start, DateTime end)
     {
         var expenses = new OperatingExpenseSection();
-        
-        // المصروفات من المعاملات النقدية
-        var cashExpenses = await _context.CashTransactions
-            .Where(t => t.TransactionDate >= start && t.TransactionDate <= end)
-            .Where(t => t.Type == TransactionType.Expense)
-            .ToListAsync();
-        
-        expenses.Salaries = cashExpenses
+
+        // ✅ فلترة مباشرة في SQL بدلاً من جلب كل البيانات وفلترتها في الميموري
+        var baseQuery = _context.CashTransactions
+            .Where(t => t.TransactionDate >= start && t.TransactionDate <= end
+                     && t.Type == TransactionType.Expense
+                     && !t.IsDeleted);
+
+        expenses.Salaries = await baseQuery
             .Where(e => e.Category == "Salaries" || e.Category == "Payroll")
-            .Sum(e => e.Amount);
-        
-        expenses.Rent = cashExpenses
+            .SumAsync(e => e.Amount);
+
+        expenses.Rent = await baseQuery
             .Where(e => e.Category == "Rent")
-            .Sum(e => e.Amount);
-        
-        expenses.Utilities = cashExpenses
+            .SumAsync(e => e.Amount);
+
+        expenses.Utilities = await baseQuery
             .Where(e => e.Category == "Utilities")
-            .Sum(e => e.Amount);
-        
-        expenses.Marketing = cashExpenses
+            .SumAsync(e => e.Amount);
+
+        expenses.Marketing = await baseQuery
             .Where(e => e.Category == "Marketing" || e.Category == "Advertising")
-            .Sum(e => e.Amount);
-        
-        expenses.Administrative = cashExpenses
+            .SumAsync(e => e.Amount);
+
+        expenses.Administrative = await baseQuery
             .Where(e => e.Category == "Administrative" || e.Category == "Office")
-            .Sum(e => e.Amount);
-        
-        expenses.OtherExpenses = cashExpenses
+            .SumAsync(e => e.Amount);
+
+        expenses.OtherExpenses = await baseQuery
             .Where(e => e.Category == "Other" || string.IsNullOrEmpty(e.Category))
-            .Sum(e => e.Amount);
-        
+            .SumAsync(e => e.Amount);
+
         return expenses;
     }
     

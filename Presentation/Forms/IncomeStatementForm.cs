@@ -1,4 +1,4 @@
-﻿using GraceWay.AccountingSystem.Application.Services;
+using GraceWay.AccountingSystem.Application.Services;
 using GraceWay.AccountingSystem.Domain.Entities;
 using GraceWay.AccountingSystem.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -17,10 +17,8 @@ public partial class IncomeStatementForm : Form
     private Button btnExportExcel = null!;
     private Button btnExportPdf = null!;
     private Button btnPrint = null!;
-    private Label lblTotalRevenue = null!;
-    private Label lblTotalExpenses = null!;
-    private Label lblNetIncome = null!;
-    
+    private Panel totalsPanel = null!;
+
     // For printing
     private int currentRow = 0;
     private bool hasMorePages = false;
@@ -36,7 +34,7 @@ public partial class IncomeStatementForm : Form
     private void InitializeCustomComponents()
     {
         this.Text = "📊 قائمة الدخل";
-        this.Size = new Size(1200, 800);
+        this.Size = new Size(1300, 900);
         this.RightToLeft = RightToLeft.Yes;
         this.RightToLeftLayout = true;
         this.BackColor = ColorScheme.Background;
@@ -45,13 +43,14 @@ public partial class IncomeStatementForm : Form
         {
             Dock = DockStyle.Fill,
             BackColor = Color.White,
-            Padding = new Padding(30)
+            Padding = new Padding(30),
+            AutoScroll = true
         };
 
         Label lblTitle = new Label
         {
-            Text = "📊 قائمة الدخل (Income Statement)",
-            Font = new Font("Cairo", 18F, FontStyle.Bold),
+            Text = "📊 قائمة الدخل مفصّلة بالعملات (Income Statement by Currency)",
+            Font = new Font("Cairo", 16F, FontStyle.Bold),
             ForeColor = ColorScheme.Primary,
             AutoSize = true,
             Location = new Point(30, 20)
@@ -60,389 +59,371 @@ public partial class IncomeStatementForm : Form
         // Filter Panel
         Panel filterPanel = new Panel
         {
-            Size = new Size(1140, 100),
-            Location = new Point(30, 70),
+            Size = new Size(1240, 60),
+            Location = new Point(30, 60),
             BackColor = ColorScheme.Background,
             BorderStyle = BorderStyle.FixedSingle
         };
 
-        // Date Filters Row
-        Label lblFrom = new Label
-        {
-            Text = "من تاريخ:",
-            Font = new Font("Cairo", 11F),
-            Location = new Point(1030, 15),
-            AutoSize = true
-        };
-        dtpFrom = new DateTimePicker
-        {
-            Format = DateTimePickerFormat.Short,
-            Location = new Point(870, 12),
-            Size = new Size(150, 30),
-            Font = new Font("Cairo", 10F),
-            Value = new DateTime(DateTime.Today.Year, 1, 1)
-        };
+        Label lblFrom = new Label { Text = "من:", Font = new Font("Cairo", 11F), Location = new Point(1160, 15), AutoSize = true };
+        dtpFrom = new DateTimePicker { Format = DateTimePickerFormat.Short, Location = new Point(990, 12), Size = new Size(160, 30), Font = new Font("Cairo", 10F), Value = new DateTime(DateTime.Today.Year, 1, 1) };
+        Label lblTo = new Label { Text = "إلى:", Font = new Font("Cairo", 11F), Location = new Point(950, 15), AutoSize = true };
+        dtpTo = new DateTimePicker { Format = DateTimePickerFormat.Short, Location = new Point(780, 12), Size = new Size(160, 30), Font = new Font("Cairo", 10F), Value = DateTime.Today };
 
-        Label lblTo = new Label
-        {
-            Text = "إلى تاريخ:",
-            Font = new Font("Cairo", 11F),
-            Location = new Point(790, 15),
-            AutoSize = true
-        };
-        dtpTo = new DateTimePicker
-        {
-            Format = DateTimePickerFormat.Short,
-            Location = new Point(630, 12),
-            Size = new Size(150, 30),
-            Font = new Font("Cairo", 10F),
-            Value = DateTime.Today
-        };
-
-        // Action Buttons Row - Aligned and Equal Width
-        int buttonY = 52;
-        int buttonWidth = 120;
-        int buttonSpacing = 15;
-        int startX = 1140 - 40 - (4 * buttonWidth) - (3 * buttonSpacing);
-
-        btnGenerate = new Button
-        {
-            Text = "📊 إنشاء التقرير",
-            Location = new Point(startX + (3 * (buttonWidth + buttonSpacing)), buttonY),
-            Size = new Size(buttonWidth, 38),
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
-            BackColor = ColorScheme.Primary,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand
-        };
-        btnGenerate.FlatAppearance.BorderSize = 0;
+        btnGenerate = CreateButton("📊 إنشاء التقرير", ColorScheme.Primary, new Point(620, 11), new Size(150, 38));
         btnGenerate.Click += BtnGenerate_Click;
 
-        btnExportExcel = new Button
-        {
-            Text = "📥 Excel",
-            Location = new Point(startX + (2 * (buttonWidth + buttonSpacing)), buttonY),
-            Size = new Size(buttonWidth, 38),
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
-            BackColor = Color.FromArgb(46, 125, 50),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand,
-            Enabled = false
-        };
-        btnExportExcel.FlatAppearance.BorderSize = 0;
+        btnExportExcel = CreateButton("📥 Excel", Color.FromArgb(46, 125, 50), new Point(460, 11), new Size(150, 38));
         btnExportExcel.Click += BtnExportExcel_Click;
+        btnExportExcel.Enabled = false;
 
-        btnExportPdf = new Button
-        {
-            Text = "📄 PDF",
-            Location = new Point(startX + (buttonWidth + buttonSpacing), buttonY),
-            Size = new Size(buttonWidth, 38),
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
-            BackColor = Color.FromArgb(211, 47, 47),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand,
-            Enabled = false
-        };
-        btnExportPdf.FlatAppearance.BorderSize = 0;
+        btnExportPdf = CreateButton("📄 PDF", Color.FromArgb(211, 47, 47), new Point(300, 11), new Size(150, 38));
         btnExportPdf.Click += BtnExportPdf_Click;
+        btnExportPdf.Enabled = false;
 
-        btnPrint = new Button
-        {
-            Text = "🖨️ طباعة",
-            Location = new Point(startX, buttonY),
-            Size = new Size(buttonWidth, 38),
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
-            BackColor = ColorScheme.Warning,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Cursor = Cursors.Hand,
-            Enabled = false
-        };
-        btnPrint.FlatAppearance.BorderSize = 0;
+        btnPrint = CreateButton("🖨️ طباعة", ColorScheme.Warning, new Point(140, 11), new Size(150, 38));
         btnPrint.Click += BtnPrint_Click;
+        btnPrint.Enabled = false;
 
-        filterPanel.Controls.AddRange(new Control[] {
-            lblFrom, dtpFrom, lblTo, dtpTo, btnGenerate, btnExportExcel, btnExportPdf, btnPrint
-        });
+        filterPanel.Controls.AddRange(new Control[] { lblFrom, dtpFrom, lblTo, dtpTo, btnGenerate, btnExportExcel, btnExportPdf, btnPrint });
 
         dgvIncomeStatement = new DataGridView
         {
-            Location = new Point(30, 180),
-            Size = new Size(1140, 490),
+            Location = new Point(30, 130),
+            Size = new Size(1240, 680),
             BackgroundColor = Color.White,
             BorderStyle = BorderStyle.Fixed3D,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
             ReadOnly = true,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             Font = new Font("Cairo", 10F),
             EnableHeadersVisualStyles = false,
-            ColumnHeadersHeight = 40,
-            RowTemplate = { Height = 35 }
+            ColumnHeadersHeight = 45,
+            RowTemplate = { Height = 36 },
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+            ScrollBars = ScrollBars.Both
         };
-
         dgvIncomeStatement.ColumnHeadersDefaultCellStyle.BackColor = ColorScheme.Primary;
         dgvIncomeStatement.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
         dgvIncomeStatement.ColumnHeadersDefaultCellStyle.Font = new Font("Cairo", 11F, FontStyle.Bold);
-        dgvIncomeStatement.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(240, 248, 255);
+        dgvIncomeStatement.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
-        Panel totalsPanel = new Panel
+        totalsPanel = new Panel
         {
-            Location = new Point(30, 680),
-            Size = new Size(1140, 80),
+            Location = new Point(30, 820),
+            Size = new Size(1240, 50),
             BackColor = ColorScheme.Background,
             BorderStyle = BorderStyle.FixedSingle
         };
 
-        lblTotalRevenue = new Label
-        {
-            Text = "إجمالي الإيرادات: 0.00",
-            Font = new Font("Cairo", 12F, FontStyle.Bold),
-            ForeColor = ColorScheme.Success,
-            Location = new Point(750, 10),
-            AutoSize = true
-        };
-
-        lblTotalExpenses = new Label
-        {
-            Text = "إجمالي المصروفات: 0.00",
-            Font = new Font("Cairo", 12F, FontStyle.Bold),
-            ForeColor = ColorScheme.Error,
-            Location = new Point(400, 10),
-            AutoSize = true
-        };
-
-        lblNetIncome = new Label
-        {
-            Text = "صافي الربح: 0.00",
-            Font = new Font("Cairo", 14F, FontStyle.Bold),
-            ForeColor = ColorScheme.Primary,
-            Location = new Point(100, 10),
-            AutoSize = true
-        };
-
-        Label lblNetLabel = new Label
-        {
-            Text = "(الإيرادات - المصروفات)",
-            Font = new Font("Cairo", 10F),
-            ForeColor = Color.Gray,
-            Location = new Point(100, 45),
-            AutoSize = true
-        };
-
-        totalsPanel.Controls.AddRange(new Control[] { 
-            lblTotalRevenue, lblTotalExpenses, lblNetIncome, lblNetLabel 
-        });
-
-        mainPanel.Controls.AddRange(new Control[] {
-            lblTitle, filterPanel, dgvIncomeStatement, totalsPanel
-        });
-
+        mainPanel.Controls.AddRange(new Control[] { lblTitle, filterPanel, dgvIncomeStatement, totalsPanel });
         this.Controls.Add(mainPanel);
+    }
+
+    private Button CreateButton(string text, Color backColor, Point location, Size size)
+    {
+        var btn = new Button
+        {
+            Text = text,
+            Location = location,
+            Size = size,
+            Font = new Font("Cairo", 10F, FontStyle.Bold),
+            BackColor = backColor,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
+        };
+        btn.FlatAppearance.BorderSize = 0;
+        return btn;
+    }
+
+    // ========== Data model for currency-grouped results ==========
+    private class CurrencyGroup
+    {
+        public string CurrencyCode { get; set; } = "";
+        public string CurrencyName { get; set; } = "";
+        public string Symbol      { get; set; } = "";
+        // Revenues
+        public decimal SalesRevenue       { get; set; }
+        public int     SalesCount         { get; set; }
+        public decimal CashIncomeOriginal { get; set; }
+        public int     CashIncomeCount    { get; set; }
+        public decimal JournalRevenue     { get; set; }
+        // Expenses
+        public decimal PurchaseExpense    { get; set; }
+        public int     PurchaseCount      { get; set; }
+        public decimal CashExpenseOriginal{ get; set; }
+        public int     CashExpenseCount   { get; set; }
+        public decimal JournalExpense     { get; set; }
+        // Totals
+        public decimal TotalRevenue  => SalesRevenue + CashIncomeOriginal + JournalRevenue;
+        public decimal TotalExpenses => PurchaseExpense + CashExpenseOriginal + JournalExpense;
+        public decimal NetIncome     => TotalRevenue - TotalExpenses;
     }
 
     private async void BtnGenerate_Click(object? sender, EventArgs e)
     {
         try
         {
+            btnGenerate.Enabled = false;
+            btnGenerate.Text = "⏳ جاري التحميل...";
+
             var fromDate = DateTime.SpecifyKind(dtpFrom.Value.Date, DateTimeKind.Utc);
-            var toDate = DateTime.SpecifyKind(dtpTo.Value.Date.AddDays(1).AddSeconds(-1), DateTimeKind.Utc);
+            var toDate   = DateTime.SpecifyKind(dtpTo.Value.Date.AddDays(1).AddSeconds(-1), DateTimeKind.Utc);
 
-            using var _dbContext = _dbContextFactory.CreateDbContext();
+            using var db = _dbContextFactory.CreateDbContext();
 
-            // ========== جمع البيانات من كل المصادر ==========
-            
-            // 1. فواتير المبيعات (الإيرادات)
-            var salesInvoices = await _dbContext.Set<SalesInvoice>()
+            // ====== جلب العملات ======
+            var currencies = await db.Set<Currency>().Where(c => c.IsActive).ToListAsync();
+            var currencyMap = currencies.ToDictionary(c => c.CurrencyId, c => c);
+            var baseCurrency = currencies.FirstOrDefault(c => c.IsBaseCurrency) ?? currencies.FirstOrDefault(c => c.Code == "EGP");
+
+            // ====== فواتير المبيعات ======
+            var salesInvoices = await db.Set<SalesInvoice>()
                 .Where(s => s.InvoiceDate >= fromDate && s.InvoiceDate <= toDate)
                 .ToListAsync();
-            
-            decimal salesRevenue = salesInvoices.Sum(s => s.TotalAmount);
 
-            // 2. حركات الخزنة - الإيرادات
-            var cashIncomes = await _dbContext.Set<CashTransaction>()
-                .Where(t => t.TransactionDate >= fromDate && 
-                           t.TransactionDate <= toDate &&
-                           t.Type == TransactionType.Income &&
-                           !t.IsDeleted)
-                .ToListAsync();
-            
-            decimal cashIncomeTotal = cashIncomes.Sum(t => t.Amount);
-
-            // 3. فواتير المشتريات (المصروفات)
-            var purchaseInvoices = await _dbContext.Set<PurchaseInvoice>()
+            // ====== فواتير المشتريات ======
+            var purchaseInvoices = await db.Set<PurchaseInvoice>()
                 .Where(p => p.InvoiceDate >= fromDate && p.InvoiceDate <= toDate)
                 .ToListAsync();
-            
-            decimal purchaseExpense = purchaseInvoices.Sum(p => p.TotalAmount);
 
-            // 4. حركات الخزنة - المصروفات
-            var cashExpenses = await _dbContext.Set<CashTransaction>()
-                .Where(t => t.TransactionDate >= fromDate && 
-                           t.TransactionDate <= toDate &&
-                           t.Type == TransactionType.Expense &&
-                           !t.IsDeleted)
+            // ====== حركات الخزنة ======
+            var cashIncomes = await db.Set<CashTransaction>()
+                .Where(t => t.TransactionDate >= fromDate && t.TransactionDate <= toDate && t.Type == TransactionType.Income && !t.IsDeleted)
                 .ToListAsync();
-            
-            decimal cashExpenseTotal = cashExpenses.Sum(t => t.Amount);
 
-            // 5. حركات القيود اليومية
-            var journalLines = await _dbContext.Set<JournalEntryLine>()
+            var cashExpenses = await db.Set<CashTransaction>()
+                .Where(t => t.TransactionDate >= fromDate && t.TransactionDate <= toDate && t.Type == TransactionType.Expense && !t.IsDeleted)
+                .ToListAsync();
+
+            // ====== القيود اليومية ======
+            var journalLines = await db.Set<JournalEntryLine>()
                 .Include(l => l.Account)
                 .Include(l => l.JournalEntry)
-                .Where(l => l.JournalEntry!.EntryDate >= fromDate && 
-                           l.JournalEntry.EntryDate <= toDate &&
-                           l.JournalEntry.IsPosted)
+                .Where(l => l.JournalEntry!.EntryDate >= fromDate && l.JournalEntry.EntryDate <= toDate && l.JournalEntry.IsPosted)
                 .ToListAsync();
 
-            // حسابات الإيرادات (4xxxx)
-            var revenueAccountLines = journalLines
-                .Where(l => l.Account != null && l.Account.AccountCode.StartsWith("4"))
-                .ToList();
-            decimal journalRevenue = revenueAccountLines.Sum(l => l.CreditAmount) - 
-                                   revenueAccountLines.Sum(l => l.DebitAmount);
+            // ====== تجميع البيانات حسب العملة ======
+            var groups = new Dictionary<string, CurrencyGroup>();
 
-            // حسابات المصروفات (5xxxx)
-            var expenseAccountLines = journalLines
-                .Where(l => l.Account != null && l.Account.AccountCode.StartsWith("5"))
-                .ToList();
-            decimal journalExpense = expenseAccountLines.Sum(l => l.DebitAmount) - 
-                                    expenseAccountLines.Sum(l => l.CreditAmount);
-
-            // ========== حساب الإجماليات ==========
-            decimal totalRevenue = salesRevenue + cashIncomeTotal + journalRevenue;
-            decimal totalExpenses = purchaseExpense + cashExpenseTotal + journalExpense;
-            decimal netIncome = totalRevenue - totalExpenses;
-
-            // ========== عرض النتائج ==========
-            dgvIncomeStatement.Columns.Clear();
-            dgvIncomeStatement.Columns.Add(new DataGridViewTextBoxColumn
+            CurrencyGroup GetOrCreate(string code, string name = "", string symbol = "")
             {
-                Name = "Category",
-                HeaderText = "البند",
-                Width = 400
-            });
-            dgvIncomeStatement.Columns.Add(new DataGridViewTextBoxColumn
-            {
-                Name = "Amount",
-                HeaderText = "المبلغ",
-                Width = 200,
-                DefaultCellStyle = new DataGridViewCellStyle 
-                { 
-                    Format = "N2",
-                    Alignment = DataGridViewContentAlignment.MiddleCenter
-                }
-            });
-
-            // ========== قسم الإيرادات ==========
-            dgvIncomeStatement.Rows.Add("💰 الإيرادات (Revenues)", "");
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.BackColor = ColorScheme.Primary;
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.ForeColor = Color.White;
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.Font = new Font("Cairo", 12F, FontStyle.Bold);
-
-            if (salesRevenue > 0)
-                dgvIncomeStatement.Rows.Add($"  📑 فواتير المبيعات ({salesInvoices.Count} فاتورة)", salesRevenue);
-            
-            if (cashIncomeTotal > 0)
-                dgvIncomeStatement.Rows.Add($"  💵 إيرادات الخزنة ({cashIncomes.Count} حركة)", cashIncomeTotal);
-            
-            if (journalRevenue > 0)
-                dgvIncomeStatement.Rows.Add($"  📒 قيود يومية - إيرادات", journalRevenue);
-
-            // إجمالي الإيرادات
-            dgvIncomeStatement.Rows.Add("إجمالي الإيرادات", totalRevenue);
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.BackColor = Color.FromArgb(200, 230, 201);
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.Font = new Font("Cairo", 11F, FontStyle.Bold);
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.ForeColor = ColorScheme.Success;
-
-            // فاصل
-            dgvIncomeStatement.Rows.Add("", "");
-
-            // ========== قسم المصروفات ==========
-            dgvIncomeStatement.Rows.Add("💸 المصروفات (Expenses)", "");
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.BackColor = ColorScheme.Primary;
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.ForeColor = Color.White;
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.Font = new Font("Cairo", 12F, FontStyle.Bold);
-
-            if (purchaseExpense > 0)
-                dgvIncomeStatement.Rows.Add($"  📑 فواتير المشتريات ({purchaseInvoices.Count} فاتورة)", purchaseExpense);
-            
-            if (cashExpenseTotal > 0)
-                dgvIncomeStatement.Rows.Add($"  💸 مصروفات الخزنة ({cashExpenses.Count} حركة)", cashExpenseTotal);
-            
-            if (journalExpense > 0)
-                dgvIncomeStatement.Rows.Add($"  📒 قيود يومية - مصروفات", journalExpense);
-
-            // إجمالي المصروفات
-            dgvIncomeStatement.Rows.Add("إجمالي المصروفات", totalExpenses);
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.BackColor = Color.FromArgb(255, 205, 210);
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.Font = new Font("Cairo", 11F, FontStyle.Bold);
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.ForeColor = ColorScheme.Error;
-
-            // فاصل
-            dgvIncomeStatement.Rows.Add("", "");
-            dgvIncomeStatement.Rows.Add("", "");
-
-            // ========== صافي الربح/الخسارة ==========
-            string profitLabel = netIncome >= 0 ? "✅ صافي الربح (Net Profit)" : "❌ صافي الخسارة (Net Loss)";
-            dgvIncomeStatement.Rows.Add(profitLabel, Math.Abs(netIncome));
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.BackColor = netIncome >= 0 ? ColorScheme.Success : ColorScheme.Error;
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.ForeColor = Color.White;
-            dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1].DefaultCellStyle.Font = new Font("Cairo", 14F, FontStyle.Bold);
-
-            // ========== تحديث التسميات ==========
-            lblTotalRevenue.Text = $"إجمالي الإيرادات: {totalRevenue:N2} جنيه";
-            lblTotalExpenses.Text = $"إجمالي المصروفات: {totalExpenses:N2} جنيه";
-            
-            if (netIncome >= 0)
-            {
-                lblNetIncome.Text = $"صافي الربح: {netIncome:N2} جنيه";
-                lblNetIncome.ForeColor = ColorScheme.Success;
-            }
-            else
-            {
-                lblNetIncome.Text = $"صافي الخسارة: {Math.Abs(netIncome):N2} جنيه";
-                lblNetIncome.ForeColor = ColorScheme.Error;
+                if (!groups.ContainsKey(code))
+                    groups[code] = new CurrencyGroup { CurrencyCode = code, CurrencyName = name, Symbol = symbol };
+                return groups[code];
             }
 
-            // تمكين الأزرار
+            // فواتير مبيعات - التجميع حسب العملة
+            foreach (var grp in salesInvoices.GroupBy(s => s.CurrencyId))
+            {
+                Currency? cur = grp.Key.HasValue && currencyMap.ContainsKey(grp.Key.Value) ? currencyMap[grp.Key.Value] : baseCurrency;
+                string code   = cur?.Code   ?? "EGP";
+                string name   = cur?.Name   ?? "جنيه مصري";
+                string symbol = cur?.Symbol ?? "ج.م";
+                var g = GetOrCreate(code, name, symbol);
+                g.SalesRevenue += grp.Sum(s => s.TotalAmount);
+                g.SalesCount   += grp.Count();
+            }
+
+            // فواتير مشتريات - التجميع حسب العملة
+            foreach (var grp in purchaseInvoices.GroupBy(p => p.CurrencyId))
+            {
+                Currency? cur = grp.Key.HasValue && currencyMap.ContainsKey(grp.Key.Value) ? currencyMap[grp.Key.Value] : baseCurrency;
+                string code   = cur?.Code   ?? "EGP";
+                string name   = cur?.Name   ?? "جنيه مصري";
+                string symbol = cur?.Symbol ?? "ج.م";
+                var g = GetOrCreate(code, name, symbol);
+                g.PurchaseExpense += grp.Sum(p => p.TotalAmount);
+                g.PurchaseCount   += grp.Count();
+            }
+
+            // حركات الخزنة - الإيرادات - التجميع حسب TransactionCurrency
+            foreach (var grp in cashIncomes.GroupBy(t => t.TransactionCurrency ?? "EGP"))
+            {
+                string code = grp.Key;
+                var cur = currencies.FirstOrDefault(c => c.Code == code);
+                var g = GetOrCreate(code, cur?.Name ?? code, cur?.Symbol ?? code);
+                // نستخدم OriginalAmount لو موجود (بالعملة الأصلية) وإلا Amount
+                g.CashIncomeOriginal += grp.Sum(t => t.OriginalAmount ?? t.Amount);
+                g.CashIncomeCount    += grp.Count();
+            }
+
+            // حركات الخزنة - المصروفات - التجميع حسب TransactionCurrency
+            foreach (var grp in cashExpenses.GroupBy(t => t.TransactionCurrency ?? "EGP"))
+            {
+                string code = grp.Key;
+                var cur = currencies.FirstOrDefault(c => c.Code == code);
+                var g = GetOrCreate(code, cur?.Name ?? code, cur?.Symbol ?? code);
+                g.CashExpenseOriginal += grp.Sum(t => t.OriginalAmount ?? t.Amount);
+                g.CashExpenseCount    += grp.Count();
+            }
+
+            // القيود اليومية - إيرادات حسابات 4xxxx  (لا عملة محددة - تُضاف للعملة الأساسية)
+            var baseCode = baseCurrency?.Code ?? "EGP";
+            var revenueLines = journalLines.Where(l => l.Account?.AccountCode?.StartsWith("4") == true).ToList();
+            if (revenueLines.Any())
+            {
+                var g = GetOrCreate(baseCode, baseCurrency?.Name ?? "جنيه مصري", baseCurrency?.Symbol ?? "ج.م");
+                g.JournalRevenue += revenueLines.Sum(l => l.CreditAmount) - revenueLines.Sum(l => l.DebitAmount);
+            }
+
+            // القيود اليومية - مصروفات حسابات 5xxxx
+            var expenseLines = journalLines.Where(l => l.Account?.AccountCode?.StartsWith("5") == true).ToList();
+            if (expenseLines.Any())
+            {
+                var g = GetOrCreate(baseCode, baseCurrency?.Name ?? "جنيه مصري", baseCurrency?.Symbol ?? "ج.م");
+                g.JournalExpense += expenseLines.Sum(l => l.DebitAmount) - expenseLines.Sum(l => l.CreditAmount);
+            }
+
+            // ====== بناء الجدول ======
+            BuildGrid(groups.Values.OrderByDescending(g => g.TotalRevenue + g.TotalExpenses).ToList(), fromDate, toDate);
+
             btnExportExcel.Enabled = true;
-            btnExportPdf.Enabled = true;
-            btnPrint.Enabled = true;
-
-            // رسالة نجاح
-            if (totalRevenue == 0 && totalExpenses == 0)
-            {
-                MessageBox.Show(
-                    "⚠️ تنبيه: لا توجد حركات مالية في الفترة المحددة!\n\n" +
-                    $"الفترة: من {fromDate:dd/MM/yyyy} إلى {toDate:dd/MM/yyyy}\n\n" +
-                    "تأكد من وجود:\n" +
-                    "• فواتير مبيعات\n" +
-                    "• فواتير مشتريات\n" +
-                    "• حركات خزنة (إيرادات/مصروفات)\n" +
-                    "• قيود يومية معتمدة",
-                    "لا توجد بيانات",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information,
-                    MessageBoxDefaultButton.Button1,
-                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign
-                );
-            }
+            btnExportPdf.Enabled   = true;
+            btnPrint.Enabled       = true;
         }
         catch (Exception ex)
         {
-            MessageBox.Show(
-                $"❌ خطأ في إنشاء قائمة الدخل:\n\n{ex.Message}\n\n{ex.StackTrace}",
-                "خطأ",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error,
-                MessageBoxDefaultButton.Button1,
-                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign
-            );
+            MessageBox.Show($"❌ خطأ في إنشاء قائمة الدخل:\n\n{ex.Message}",
+                "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error,
+                MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+        }
+        finally
+        {
+            btnGenerate.Enabled = true;
+            btnGenerate.Text    = "📊 إنشاء التقرير";
+        }
+    }
+
+    private void BuildGrid(List<CurrencyGroup> groups, DateTime fromDate, DateTime toDate)
+    {
+        dgvIncomeStatement.Columns.Clear();
+        dgvIncomeStatement.Rows.Clear();
+
+        // أعمدة: البند | المبلغ | العملة
+        var colItem = new DataGridViewTextBoxColumn { Name = "Item", HeaderText = "البند / التفاصيل", Width = 500 };
+        var colAmt  = new DataGridViewTextBoxColumn { Name = "Amount", HeaderText = "المبلغ", Width = 220,
+            DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleLeft, Format = "N2" } };
+        var colCur  = new DataGridViewTextBoxColumn { Name = "Currency", HeaderText = "العملة", Width = 120,
+            DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter } };
+        dgvIncomeStatement.Columns.AddRange(colItem, colAmt, colCur);
+
+        Color headerBg  = ColorScheme.Primary;
+        Color revBg     = Color.FromArgb(200, 230, 201);
+        Color expBg     = Color.FromArgb(255, 205, 210);
+        Color sectionBg = Color.FromArgb(235, 245, 251);
+        Color netGreenBg= Color.FromArgb(27, 94, 32);
+        Color netRedBg  = Color.FromArgb(183, 28, 28);
+
+        void AddSectionHeader(string text)
+        {
+            dgvIncomeStatement.Rows.Add(text, "", "");
+            var r = dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1];
+            r.DefaultCellStyle.BackColor = headerBg;
+            r.DefaultCellStyle.ForeColor = Color.White;
+            r.DefaultCellStyle.Font = new Font("Cairo", 12F, FontStyle.Bold);
+        }
+
+        void AddDetailRow(string item, decimal amount, string currency, Color? bg = null)
+        {
+            dgvIncomeStatement.Rows.Add(item, amount, currency);
+            var r = dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1];
+            if (bg.HasValue) { r.DefaultCellStyle.BackColor = bg.Value; r.DefaultCellStyle.ForeColor = Color.Black; }
+        }
+
+        void AddTotalRow(string item, decimal amount, string currency, Color bg, Color fg, float fontSize = 11F)
+        {
+            dgvIncomeStatement.Rows.Add(item, amount, currency);
+            var r = dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1];
+            r.DefaultCellStyle.BackColor = bg;
+            r.DefaultCellStyle.ForeColor = fg;
+            r.DefaultCellStyle.Font = new Font("Cairo", fontSize, FontStyle.Bold);
+        }
+
+        void AddSeparator()
+        {
+            dgvIncomeStatement.Rows.Add("", "", "");
+        }
+
+        if (!groups.Any())
+        {
+            AddSectionHeader("⚠️ لا توجد حركات مالية في الفترة المحددة");
+            return;
+        }
+
+        // ====== لكل عملة - قسم مستقل ======
+        foreach (var g in groups)
+        {
+            string sym = string.IsNullOrWhiteSpace(g.Symbol) ? g.CurrencyCode : $"{g.Symbol} ({g.CurrencyCode})";
+
+            // عنوان العملة
+            dgvIncomeStatement.Rows.Add($"═══  {g.CurrencyName}  ({g.CurrencyCode})  ═══", "", "");
+            var headerRow = dgvIncomeStatement.Rows[dgvIncomeStatement.Rows.Count - 1];
+            headerRow.DefaultCellStyle.BackColor = Color.FromArgb(13, 71, 161);
+            headerRow.DefaultCellStyle.ForeColor = Color.White;
+            headerRow.DefaultCellStyle.Font = new Font("Cairo", 13F, FontStyle.Bold);
+
+            // ----- قسم الإيرادات -----
+            AddSectionHeader("  💰 الإيرادات");
+
+            if (g.SalesRevenue != 0)
+                AddDetailRow($"    📑 فواتير المبيعات ({g.SalesCount} فاتورة)", g.SalesRevenue, sym, sectionBg);
+            if (g.CashIncomeOriginal != 0)
+                AddDetailRow($"    💵 إيرادات الخزنة ({g.CashIncomeCount} حركة)", g.CashIncomeOriginal, sym, sectionBg);
+            if (g.JournalRevenue != 0)
+                AddDetailRow("    📒 قيود يومية - إيرادات", g.JournalRevenue, sym, sectionBg);
+
+            AddTotalRow("  إجمالي الإيرادات", g.TotalRevenue, sym, revBg, ColorScheme.Success);
+
+            AddSeparator();
+
+            // ----- قسم المصروفات -----
+            AddSectionHeader("  💸 المصروفات");
+
+            if (g.PurchaseExpense != 0)
+                AddDetailRow($"    📑 فواتير المشتريات ({g.PurchaseCount} فاتورة)", g.PurchaseExpense, sym, sectionBg);
+            if (g.CashExpenseOriginal != 0)
+                AddDetailRow($"    💸 مصروفات الخزنة ({g.CashExpenseCount} حركة)", g.CashExpenseOriginal, sym, sectionBg);
+            if (g.JournalExpense != 0)
+                AddDetailRow("    📒 قيود يومية - مصروفات", g.JournalExpense, sym, sectionBg);
+
+            AddTotalRow("  إجمالي المصروفات", g.TotalExpenses, sym, expBg, ColorScheme.Error);
+
+            AddSeparator();
+
+            // ----- صافي الربح/الخسارة لهذه العملة -----
+            bool profit = g.NetIncome >= 0;
+            string netLabel = profit ? $"  ✅ صافي الربح" : $"  ❌ صافي الخسارة";
+            AddTotalRow(netLabel, Math.Abs(g.NetIncome), sym,
+                profit ? netGreenBg : netRedBg, Color.White, 12F);
+
+            AddSeparator();
+            AddSeparator();
+        }
+
+        // ====== ملخص إجمالي (تحديث اللوحة السفلية) ======
+        totalsPanel.Controls.Clear();
+
+        int x = 20;
+        foreach (var g in groups)
+        {
+            string sym = g.Symbol ?? g.CurrencyCode;
+            bool profit = g.NetIncome >= 0;
+            var lbl = new Label
+            {
+                Text = $"{g.CurrencyCode}: إيرادات {g.TotalRevenue:N2} {sym}  |  مصروفات {g.TotalExpenses:N2} {sym}  |  صافي {(profit ? "+" : "-")}{Math.Abs(g.NetIncome):N2} {sym}",
+                Font = new Font("Cairo", 10F, FontStyle.Bold),
+                ForeColor = profit ? ColorScheme.Success : ColorScheme.Error,
+                AutoSize = true,
+                Location = new Point(x, 12)
+            };
+            totalsPanel.Controls.Add(lbl);
+            x = 20;
+            // stack vertically if multiple currencies
+            totalsPanel.Height = Math.Max(50, (groups.Count * 30) + 20);
+            lbl.Location = new Point(20, (groups.IndexOf(g) * 28) + 10);
         }
     }
 
@@ -450,36 +431,23 @@ public partial class IncomeStatementForm : Form
     {
         try
         {
-            SaveFileDialog saveDialog = new SaveFileDialog
+            var saveDialog = new SaveFileDialog
             {
                 Filter = "Excel Files|*.xlsx",
-                Title = "حفظ قائمة الدخل",
+                Title  = "حفظ قائمة الدخل",
                 FileName = $"قائمة_الدخل_{DateTime.Now:yyyyMMdd}.xlsx"
             };
-
             if (saveDialog.ShowDialog() == DialogResult.OK)
             {
-                bool success = await _exportService.ExportToExcelAsync(
-                    dgvIncomeStatement, 
-                    saveDialog.FileName, 
-                    "قائمة الدخل"
-                );
-
-                if (success)
-                {
-                    MessageBox.Show("تم تصدير التقرير بنجاح!", "نجح",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information,
-                        MessageBoxDefaultButton.Button1,
-                        MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
-                }
+                bool ok = await _exportService.ExportToExcelAsync(dgvIncomeStatement, saveDialog.FileName, "قائمة الدخل");
+                if (ok) MessageBox.Show("تم التصدير بنجاح!", "نجح", MessageBoxButtons.OK, MessageBoxIcon.Information,
+                    MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في التصدير: {ex.Message}", "خطأ",
-                MessageBoxButtons.OK, MessageBoxIcon.Error,
-                MessageBoxDefaultButton.Button1,
-                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            MessageBox.Show($"خطأ في التصدير: {ex.Message}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error,
+                MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
         }
     }
 
@@ -487,37 +455,25 @@ public partial class IncomeStatementForm : Form
     {
         try
         {
-            SaveFileDialog saveDialog = new SaveFileDialog
+            var saveDialog = new SaveFileDialog
             {
-                Filter = "HTML Files|*.html",
-                Title = "حفظ قائمة الدخل",
+                Filter   = "HTML Files|*.html",
+                Title    = "حفظ قائمة الدخل",
                 FileName = $"قائمة_الدخل_{DateTime.Now:yyyyMMdd}.html"
             };
-
             if (saveDialog.ShowDialog() == DialogResult.OK)
             {
-                var metadata = new Dictionary<string, string>
+                var meta = new Dictionary<string, string>
                 {
-                    { "الفترة", $"من {dtpFrom.Value:yyyy/MM/dd} إلى {dtpTo.Value:yyyy/MM/dd}" },
-                    { "إجمالي الإيرادات", lblTotalRevenue.Text },
-                    { "إجمالي المصروفات", lblTotalExpenses.Text },
-                    { "صافي الربح", lblNetIncome.Text }
+                    { "الفترة", $"من {dtpFrom.Value:yyyy/MM/dd} إلى {dtpTo.Value:yyyy/MM/dd}" }
                 };
-
-                bool success = await _exportService.ExportToPdfAsync(
-                    dgvIncomeStatement,
-                    saveDialog.FileName,
-                    "📊 قائمة الدخل",
-                    metadata
-                );
+                await _exportService.ExportToPdfAsync(dgvIncomeStatement, saveDialog.FileName, "📊 قائمة الدخل", meta);
             }
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في التصدير: {ex.Message}", "خطأ",
-                MessageBoxButtons.OK, MessageBoxIcon.Error,
-                MessageBoxDefaultButton.Button1,
-                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            MessageBox.Show($"خطأ في التصدير: {ex.Message}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error,
+                MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
         }
     }
 
@@ -527,19 +483,14 @@ public partial class IncomeStatementForm : Form
         {
             if (dgvIncomeStatement.Rows.Count == 0)
             {
-                MessageBox.Show("لا توجد بيانات للطباعة", "تنبيه",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning,
-                    MessageBoxDefaultButton.Button1,
-                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                MessageBox.Show("لا توجد بيانات للطباعة", "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
                 return;
             }
-            
-            PrintDocument printDoc = new PrintDocument();
+            var printDoc = new PrintDocument();
             printDoc.PrintPage += PrintDocument_PrintPage;
-            
-            PrintDialog printDialog = new PrintDialog { Document = printDoc };
-
-            if (printDialog.ShowDialog() == DialogResult.OK)
+            var dlg = new PrintDialog { Document = printDoc };
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
                 currentRow = 0;
                 hasMorePages = false;
@@ -548,138 +499,68 @@ public partial class IncomeStatementForm : Form
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"خطأ في الطباعة: {ex.Message}", "خطأ",
-                MessageBoxButtons.OK, MessageBoxIcon.Error,
-                MessageBoxDefaultButton.Button1,
-                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            MessageBox.Show($"خطأ في الطباعة: {ex.Message}", "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error,
+                MessageBoxDefaultButton.Button1, MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
         }
     }
 
     private void PrintDocument_PrintPage(object sender, PrintPageEventArgs e)
     {
-        try
+        var g = e.Graphics!;
+        var titleFont  = new Font("Cairo", 14, FontStyle.Bold);
+        var headerFont = new Font("Cairo", 11, FontStyle.Bold);
+        var normalFont = new Font("Cairo", 10);
+        var smallFont  = new Font("Cairo", 8);
+
+        float y = e.MarginBounds.Top;
+        float pageWidth = e.MarginBounds.Width;
+        float x = e.MarginBounds.Left;
+
+        if (currentRow == 0)
         {
-            Graphics g = e.Graphics!;
-            Font titleFont = new Font("Cairo", 16, FontStyle.Bold);
-            Font headerFont = new Font("Cairo", 12, FontStyle.Bold);
-            Font normalFont = new Font("Cairo", 10);
-            Font smallFont = new Font("Cairo", 9);
-
-            float y = e.MarginBounds.Top;
-            float x = e.MarginBounds.Left;
-            float pageWidth = e.MarginBounds.Width;
-
-            // Title
-            string title = "📊 قائمة الدخل";
-            SizeF titleSize = g.MeasureString(title, titleFont);
-            g.DrawString(title, titleFont, Brushes.Black, x + (pageWidth - titleSize.Width) / 2, y);
-            y += titleSize.Height + 10;
-
-            // Date range
-            string dateRange = $"من {dtpFrom.Value:yyyy/MM/dd} إلى {dtpTo.Value:yyyy/MM/dd}";
-            SizeF dateSize = g.MeasureString(dateRange, normalFont);
-            g.DrawString(dateRange, normalFont, Brushes.Black, x + (pageWidth - dateSize.Width) / 2, y);
-            y += dateSize.Height + 20;
-
-            // Column headers
-            float col1Width = pageWidth * 0.65f; // Account
-            float col2Width = pageWidth * 0.35f; // Amount
-
-            float col1X = x + pageWidth - col1Width;
-            float col2X = x;
-
-            // Draw header background
-            g.FillRectangle(new SolidBrush(ColorScheme.Primary), x, y, pageWidth, 30);
-            
-            // Draw headers
-            g.DrawString("البند", headerFont, Brushes.White, col1X + 10, y + 5);
-            g.DrawString("المبلغ", headerFont, Brushes.White, col2X + 10, y + 5);
-            
-            y += 35;
-
-            // Draw rows
-            int rowsPerPage = (int)((e.MarginBounds.Bottom - y - 120) / 25);
-            int rowsPrinted = 0;
-
-            for (int i = currentRow; i < dgvIncomeStatement.Rows.Count && rowsPrinted < rowsPerPage; i++)
-            {
-                DataGridViewRow row = dgvIncomeStatement.Rows[i];
-                
-                // Apply row styling
-                Color bgColor = Color.White;
-                Font rowFont = normalFont;
-                Color textColor = Color.Black;
-                
-                if (row.DefaultCellStyle.BackColor != Color.Empty && 
-                    row.DefaultCellStyle.BackColor != Color.White)
-                {
-                    bgColor = row.DefaultCellStyle.BackColor;
-                }
-                if (row.DefaultCellStyle.Font != null)
-                {
-                    rowFont = row.DefaultCellStyle.Font;
-                }
-                if (row.DefaultCellStyle.ForeColor != Color.Empty)
-                {
-                    textColor = row.DefaultCellStyle.ForeColor;
-                }
-                
-                g.FillRectangle(new SolidBrush(bgColor), x, y, pageWidth, 25);
-
-                string item = row.Cells[0].Value?.ToString() ?? "";
-                string amount = row.Cells[1].Value?.ToString() ?? "";
-                
-                g.DrawString(item, rowFont, new SolidBrush(textColor), col1X + 10, y + 3);
-                g.DrawString(amount, rowFont, new SolidBrush(textColor), col2X + 10, y + 3);
-
-                y += 25;
-                rowsPrinted++;
-                currentRow++;
-            }
-
-            // Draw totals if last page
-            if (currentRow >= dgvIncomeStatement.Rows.Count)
-            {
-                y += 10;
-                g.DrawLine(new Pen(Color.Black, 2), x, y, x + pageWidth, y);
-                y += 15;
-
-                g.FillRectangle(new SolidBrush(ColorScheme.Background), x, y, pageWidth, 25);
-                g.DrawString(lblTotalRevenue.Text, headerFont, new SolidBrush(ColorScheme.Success), x + 10, y + 3);
-                y += 30;
-                
-                g.FillRectangle(new SolidBrush(ColorScheme.Background), x, y, pageWidth, 25);
-                g.DrawString(lblTotalExpenses.Text, headerFont, new SolidBrush(ColorScheme.Error), x + 10, y + 3);
-                y += 30;
-
-                g.FillRectangle(new SolidBrush(ColorScheme.Background), x, y, pageWidth, 25);
-                g.DrawString(lblNetIncome.Text, headerFont, new SolidBrush(lblNetIncome.ForeColor), x + 10, y + 3);
-
-                hasMorePages = false;
-            }
-            else
-            {
-                hasMorePages = true;
-            }
-
-            // Page number
-            string pageNum = $"صفحة {(currentRow / rowsPerPage) + 1}";
-            SizeF pageNumSize = g.MeasureString(pageNum, smallFont);
-            g.DrawString(pageNum, smallFont, Brushes.Black, 
-                x + (pageWidth - pageNumSize.Width) / 2, e.MarginBounds.Bottom - 20);
-
-            // Print date
-            string printDate = $"تاريخ الطباعة: {DateTime.Now:yyyy/MM/dd HH:mm}";
-            g.DrawString(printDate, smallFont, Brushes.Black, x, e.MarginBounds.Bottom - 20);
-
-            e.HasMorePages = hasMorePages;
+            string title = $"📊 قائمة الدخل مفصّلة بالعملات | من {dtpFrom.Value:yyyy/MM/dd} إلى {dtpTo.Value:yyyy/MM/dd}";
+            var sz = g.MeasureString(title, titleFont);
+            g.DrawString(title, titleFont, Brushes.Black, x + (pageWidth - sz.Width) / 2, y);
+            y += sz.Height + 15;
         }
-        catch (Exception ex)
+
+        float col1W = pageWidth * 0.55f;
+        float col2W = pageWidth * 0.25f;
+        float col3W = pageWidth * 0.20f;
+        float col1X = x + pageWidth - col1W;
+        float col2X = x + col3W;
+        float col3X = x;
+
+        if (currentRow == 0)
         {
-            MessageBox.Show($"خطأ في تنسيق الطباعة: {ex.Message}", "خطأ",
-                MessageBoxButtons.OK, MessageBoxIcon.Error,
-                MessageBoxDefaultButton.Button1,
-                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+            g.FillRectangle(new SolidBrush(ColorScheme.Primary), x, y, pageWidth, 28);
+            g.DrawString("البند", headerFont, Brushes.White, col1X + 5, y + 5);
+            g.DrawString("المبلغ", headerFont, Brushes.White, col2X + 5, y + 5);
+            g.DrawString("العملة", headerFont, Brushes.White, col3X + 5, y + 5);
+            y += 32;
         }
+
+        int rowsPerPage = (int)((e.MarginBounds.Bottom - y - 60) / 26);
+        int printed = 0;
+
+        for (int i = currentRow; i < dgvIncomeStatement.Rows.Count && printed < rowsPerPage; i++)
+        {
+            var row = dgvIncomeStatement.Rows[i];
+            Color bg   = row.DefaultCellStyle.BackColor != Color.Empty ? row.DefaultCellStyle.BackColor : (i % 2 == 0 ? Color.White : Color.FromArgb(245, 245, 245));
+            Color fg   = row.DefaultCellStyle.ForeColor != Color.Empty ? row.DefaultCellStyle.ForeColor : Color.Black;
+            Font  font = row.DefaultCellStyle.Font ?? normalFont;
+
+            g.FillRectangle(new SolidBrush(bg), x, y, pageWidth, 26);
+            g.DrawString(row.Cells[0].Value?.ToString() ?? "", font, new SolidBrush(fg), col1X + 5, y + 4);
+            if (row.Cells[1].Value is decimal d)
+                g.DrawString(d.ToString("N2"), font, new SolidBrush(fg), col2X + 5, y + 4);
+            g.DrawString(row.Cells[2].Value?.ToString() ?? "", font, new SolidBrush(fg), col3X + 5, y + 4);
+            y += 26; printed++; currentRow++;
+        }
+
+        e.HasMorePages = hasMorePages = (currentRow < dgvIncomeStatement.Rows.Count);
+
+        string pageInfo = $"تاريخ الطباعة: {DateTime.Now:yyyy/MM/dd HH:mm}";
+        g.DrawString(pageInfo, smallFont, Brushes.Gray, x, e.MarginBounds.Bottom - 18);
     }
 }
