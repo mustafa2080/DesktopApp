@@ -13,19 +13,19 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
         private readonly AppDbContext _context;
         private readonly int _currentUserId;
 
-        private ComboBox cmbBankAccount;
-        private ComboBox cmbCustomer;
-        private ComboBox cmbTrip;
-        private TextBox txtAmount;
-        private TextBox txtReferenceNumber;
-        private DateTimePicker dtpPaymentDate;
-        private TextBox txtNotes;
-        private TextBox txtCustomerPhone;
-        private TextBox txtCustomerEmail;
-        private Button btnSave;
-        private Button btnCancel;
-        private Label lblBankBalance;
-        private CheckBox chkCreateJournalEntry;
+        private ComboBox cmbBankAccount = null!;
+        private ComboBox cmbCustomer = null!;
+        private ComboBox cmbTrip = null!;
+        private TextBox txtAmount = null!;
+        private TextBox txtReferenceNumber = null!;
+        private DateTimePicker dtpPaymentDate = null!;
+        private TextBox txtNotes = null!;
+        private TextBox txtCustomerPhone = null!;
+        private TextBox txtCustomerEmail = null!;
+        private Button btnSave = null!;
+        private Button btnCancel = null!;
+        private Label lblBankBalance = null!;
+        private CheckBox chkCreateJournalEntry = null!;
 
         public FawateerkPaymentForm(AppDbContext context, int currentUserId)
         {

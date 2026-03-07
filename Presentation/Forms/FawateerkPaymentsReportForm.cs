@@ -13,18 +13,18 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
         private readonly AppDbContext _context;
         private readonly int _currentUserId;
         
-        private DataGridView dgvPayments;
-        private DateTimePicker dtpFrom;
-        private DateTimePicker dtpTo;
-        private ComboBox cmbBank;
-        private ComboBox cmbCustomer;
-        private Button btnFilter;
-        private Button btnClear;
-        private Button btnExport;
-        private Button btnRefresh;
-        private Label lblTotalAmount;
-        private Label lblCount;
-        private TextBox txtSearch;
+        private DataGridView dgvPayments = null!;
+        private DateTimePicker dtpFrom = null!;
+        private DateTimePicker dtpTo = null!;
+        private ComboBox cmbBank = null!;
+        private ComboBox cmbCustomer = null!;
+        private Button btnFilter = null!;
+        private Button btnClear = null!;
+        private Button btnExport = null!;
+        private Button btnRefresh = null!;
+        private Label lblTotalAmount = null!;
+        private Label lblCount = null!;
+        private TextBox txtSearch = null!;
 
         public FawateerkPaymentsReportForm(AppDbContext context, int currentUserId)
         {

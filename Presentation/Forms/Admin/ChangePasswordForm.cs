@@ -1,7 +1,7 @@
 ﻿using GraceWay.AccountingSystem.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Drawing;
-using System.Linq;
 using System.Windows.Forms;
 using BCrypt.Net;
 
@@ -9,21 +9,21 @@ namespace GraceWay.AccountingSystem.Presentation.Forms.Admin;
 
 public partial class ChangePasswordForm : Form
 {
-    private readonly AppDbContext _context;
+    private readonly IDbContextFactory<AppDbContext> _dbFactory;
     private readonly int _userId;
     private readonly string _username;
 
-    private TextBox txtNewPassword;
-    private TextBox txtConfirmPassword;
-    private Button btnSave;
-    private Button btnCancel;
-    private CheckBox chkShowPassword;
+    private TextBox txtNewPassword = null!;
+    private TextBox txtConfirmPassword = null!;
+    private Button btnSave = null!;
+    private Button btnCancel = null!;
+    private CheckBox chkShowPassword = null!;
 
-    public ChangePasswordForm(AppDbContext context, int userId, string username)
+    public ChangePasswordForm(IDbContextFactory<AppDbContext> dbFactory, int userId, string username)
     {
-        _context = context;
-        _userId = userId;
-        _username = username;
+        _dbFactory = dbFactory;
+        _userId    = userId;
+        _username  = username;
         InitializeComponent();
     }
 
@@ -189,13 +189,13 @@ public partial class ChangePasswordForm : Form
 
         try
         {
-            var user = _context.Users.Find(_userId);
+            using var db = _dbFactory.CreateDbContext();
+            var user = db.Users.Find(_userId);
             if (user != null)
             {
                 user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(txtNewPassword.Text);
-                user.UpdatedAt = DateTime.UtcNow;
-                _context.SaveChanges();
-
+                user.UpdatedAt    = DateTime.UtcNow;
+                db.SaveChanges();
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }

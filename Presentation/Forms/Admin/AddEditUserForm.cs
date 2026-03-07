@@ -1,419 +1,288 @@
-﻿using GraceWay.AccountingSystem.Domain.Entities;
+using GraceWay.AccountingSystem.Domain.Entities;
 using GraceWay.AccountingSystem.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Drawing;
-using System.Linq;
-using System.Windows.Forms;
 using BCrypt.Net;
 
 namespace GraceWay.AccountingSystem.Presentation.Forms.Admin;
 
 public partial class AddEditUserForm : Form
 {
-    private readonly AppDbContext _context;
+    private readonly IDbContextFactory<AppDbContext> _dbFactory;
     private readonly int? _userId;
-    private User? _user;
 
-    private TextBox txtUsername;
-    private TextBox txtPassword;
-    private TextBox txtConfirmPassword;
-    private TextBox txtFullName;
-    private TextBox txtEmail;
-    private TextBox txtPhone;
-    private ComboBox cmbRole;
-    private CheckBox chkIsActive;
-    private Button btnSave;
-    private Button btnCancel;
-    private Label lblPasswordNote;
+    // بيانات المستخدم بعد الحفظ — يستخدمها UserManagementForm للتحديث الفوري
+    public int      SavedUserId   { get; private set; }
+    public string   SavedUsername { get; private set; } = "";
+    public string   SavedFullName { get; private set; } = "";
+    public string?  SavedEmail    { get; private set; }
+    public string?  SavedPhone    { get; private set; }
+    public string   SavedRoleName { get; private set; } = "";
+    public bool     SavedIsActive { get; private set; }
 
-    public AddEditUserForm(AppDbContext context, int? userId = null)
+    private TextBox  txtUsername        = null!;
+    private TextBox  txtPassword        = null!;
+    private TextBox  txtConfirmPassword = null!;
+    private TextBox  txtFullName        = null!;
+    private TextBox  txtEmail           = null!;
+    private TextBox  txtPhone           = null!;
+    private ComboBox cmbRole            = null!;
+    private CheckBox chkIsActive        = null!;
+    private Button   btnSave            = null!;
+    private Button   btnCancel          = null!;
+
+    public AddEditUserForm(IDbContextFactory<AppDbContext> dbFactory, int? userId = null)
     {
-        _context = context;
-        _userId = userId;
+        _dbFactory = dbFactory;
+        _userId    = userId;
         InitializeComponent();
         LoadRoles();
-        
-        if (_userId.HasValue)
-        {
-            LoadUser();
-        }
+        if (_userId.HasValue) LoadUser();
     }
 
     private void InitializeComponent()
     {
-        this.Text = _userId.HasValue ? "تعديل مستخدم" : "إضافة مستخدم جديد";
-        this.Size = new Size(600, 650);
-        this.StartPosition = FormStartPosition.CenterParent;
-        this.FormBorderStyle = FormBorderStyle.FixedDialog;
-        this.MaximizeBox = false;
-        this.MinimizeBox = false;
-        this.RightToLeft = RightToLeft.Yes;
-        this.RightToLeftLayout = true;
+        Text              = _userId.HasValue ? "تعديل مستخدم" : "إضافة مستخدم جديد";
+        Size              = new Size(580, 620);
+        StartPosition     = FormStartPosition.CenterParent;
+        FormBorderStyle   = FormBorderStyle.FixedDialog;
+        MaximizeBox       = false;
+        MinimizeBox       = false;
+        RightToLeft       = RightToLeft.Yes;
+        RightToLeftLayout = true;
+        BackColor         = Color.White;
 
-        var mainPanel = new Panel
+        var main  = new Panel { Dock = DockStyle.Fill, Padding = new Padding(30), BackColor = Color.White };
+        int y     = 20;
+        int ctrlW = 340;
+        int lblW  = 155;
+        int step  = 58;
+
+        void Row(string label, Control ctrl)
         {
-            Dock = DockStyle.Fill,
-            Padding = new Padding(30),
-            BackColor = Color.White
-        };
-
-        int yPos = 20;
-        int labelWidth = 150;
-        int controlWidth = 350;
-        int spacing = 60;
-
-        // Username
-        var lblUsername = new Label
-        {
-            Text = "اسم المستخدم: *",
-            Location = new Point(400, yPos),
-            Size = new Size(labelWidth, 25),
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-        };
-
-        txtUsername = new TextBox
-        {
-            Location = new Point(30, yPos),
-            Size = new Size(controlWidth, 30),
-            Font = new Font("Segoe UI", 10F)
-        };
-
-        yPos += spacing;
-
-        // Password
-        var lblPassword = new Label
-        {
-            Text = _userId.HasValue ? "كلمة المرور الجديدة:" : "كلمة المرور: *",
-            Location = new Point(400, yPos),
-            Size = new Size(labelWidth, 25),
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-        };
-
-        txtPassword = new TextBox
-        {
-            Location = new Point(30, yPos),
-            Size = new Size(controlWidth, 30),
-            Font = new Font("Segoe UI", 10F),
-            PasswordChar = '●',
-            UseSystemPasswordChar = true
-        };
-
-        yPos += spacing;
-
-        // Confirm Password
-        var lblConfirmPassword = new Label
-        {
-            Text = _userId.HasValue ? "تأكيد كلمة المرور:" : "تأكيد كلمة المرور: *",
-            Location = new Point(400, yPos),
-            Size = new Size(labelWidth, 25),
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-        };
-
-        txtConfirmPassword = new TextBox
-        {
-            Location = new Point(30, yPos),
-            Size = new Size(controlWidth, 30),
-            Font = new Font("Segoe UI", 10F),
-            PasswordChar = '●',
-            UseSystemPasswordChar = true
-        };
-
-        yPos += spacing;
-
-        // Password Note (for edit mode)
-        if (_userId.HasValue)
-        {
-            lblPasswordNote = new Label
+            main.Controls.Add(new Label
             {
-                Text = "ملاحظة: اترك كلمة المرور فارغة إذا كنت لا تريد تغييرها",
-                Location = new Point(30, yPos),
-                Size = new Size(520, 30),
-                Font = new Font("Segoe UI", 9F, FontStyle.Italic),
-                ForeColor = ColorScheme.Warning,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            mainPanel.Controls.Add(lblPasswordNote);
-            yPos += 40;
+                Text      = label,
+                Location  = new Point(ctrlW + 40, y + 4),
+                Size      = new Size(lblW, 24),
+                Font      = new Font("Cairo", 9.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(44, 62, 80),
+            });
+            ctrl.Location = new Point(30, y);
+            ctrl.Size     = new Size(ctrlW, 30);
+            ctrl.Font     = new Font("Cairo", 9.5F);
+            main.Controls.Add(ctrl);
+            y += step;
         }
 
-        // Full Name
-        var lblFullName = new Label
+        txtUsername        = new TextBox();
+        Row("اسم المستخدم: *", txtUsername);
+
+        txtPassword        = new TextBox { PasswordChar = '●', UseSystemPasswordChar = true };
+        Row(_userId.HasValue ? "كلمة المرور الجديدة:" : "كلمة المرور: *", txtPassword);
+
+        txtConfirmPassword = new TextBox { PasswordChar = '●', UseSystemPasswordChar = true };
+        Row(_userId.HasValue ? "تأكيد كلمة المرور:" : "تأكيد كلمة المرور: *", txtConfirmPassword);
+
+        if (_userId.HasValue)
         {
-            Text = "الاسم الكامل: *",
-            Location = new Point(400, yPos),
-            Size = new Size(labelWidth, 25),
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-        };
+            main.Controls.Add(new Label
+            {
+                Text      = "💡 اترك كلمة المرور فارغة إذا لا تريد تغييرها",
+                Location  = new Point(30, y - 14),
+                Size      = new Size(480, 20),
+                Font      = new Font("Cairo", 8.5F, FontStyle.Italic),
+                ForeColor = ColorScheme.Warning,
+            });
+            y += 14;
+        }
 
-        txtFullName = new TextBox
-        {
-            Location = new Point(30, yPos),
-            Size = new Size(controlWidth, 30),
-            Font = new Font("Segoe UI", 10F)
-        };
+        txtFullName = new TextBox();
+        Row("الاسم الكامل: *", txtFullName);
 
-        yPos += spacing;
+        txtEmail = new TextBox();
+        Row("البريد الإلكتروني:", txtEmail);
 
-        // Email
-        var lblEmail = new Label
-        {
-            Text = "البريد الإلكتروني:",
-            Location = new Point(400, yPos),
-            Size = new Size(labelWidth, 25),
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-        };
+        txtPhone = new TextBox();
+        Row("رقم الهاتف:", txtPhone);
 
-        txtEmail = new TextBox
-        {
-            Location = new Point(30, yPos),
-            Size = new Size(controlWidth, 30),
-            Font = new Font("Segoe UI", 10F)
-        };
+        cmbRole = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList };
+        Row("الدور الوظيفي: *", cmbRole);
 
-        yPos += spacing;
-
-        // Phone
-        var lblPhone = new Label
-        {
-            Text = "رقم الهاتف:",
-            Location = new Point(400, yPos),
-            Size = new Size(labelWidth, 25),
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-        };
-
-        txtPhone = new TextBox
-        {
-            Location = new Point(30, yPos),
-            Size = new Size(controlWidth, 30),
-            Font = new Font("Segoe UI", 10F)
-        };
-
-        yPos += spacing;
-
-        // Role
-        var lblRole = new Label
-        {
-            Text = "الدور الوظيفي: *",
-            Location = new Point(400, yPos),
-            Size = new Size(labelWidth, 25),
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold)
-        };
-
-        cmbRole = new ComboBox
-        {
-            Location = new Point(30, yPos),
-            Size = new Size(controlWidth, 30),
-            Font = new Font("Segoe UI", 10F),
-            DropDownStyle = ComboBoxStyle.DropDownList
-        };
-
-        yPos += spacing;
-
-        // Is Active
         chkIsActive = new CheckBox
         {
-            Text = "المستخدم نشط",
-            Location = new Point(30, yPos),
-            Size = new Size(controlWidth, 30),
-            Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-            Checked = true
+            Text      = "المستخدم نشط",
+            Location  = new Point(30, y),
+            AutoSize  = true,
+            Font      = new Font("Cairo", 10F, FontStyle.Bold),
+            ForeColor = Color.FromArgb(44, 62, 80),
+            Checked   = true,
         };
+        main.Controls.Add(chkIsActive);
+        y += 50;
 
-        yPos += 60;
-
-        // Buttons
         btnSave = new Button
         {
-            Text = "💾 حفظ",
-            Location = new Point(230, yPos),
-            Size = new Size(150, 45),
+            Text      = "💾 حفظ",
+            Location  = new Point(210, y),
+            Size      = new Size(160, 44),
             BackColor = ColorScheme.Success,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-            Cursor = Cursors.Hand
+            Font      = new Font("Cairo", 11F, FontStyle.Bold),
+            Cursor    = Cursors.Hand,
         };
         btnSave.FlatAppearance.BorderSize = 0;
         btnSave.Click += BtnSave_Click;
+        main.Controls.Add(btnSave);
 
         btnCancel = new Button
         {
-            Text = "❌ إلغاء",
-            Location = new Point(30, yPos),
-            Size = new Size(150, 45),
+            Text      = "إلغاء",
+            Location  = new Point(30, y),
+            Size      = new Size(150, 44),
             BackColor = ColorScheme.Danger,
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 12F, FontStyle.Bold),
-            Cursor = Cursors.Hand
+            Font      = new Font("Cairo", 11F, FontStyle.Bold),
+            Cursor    = Cursors.Hand,
         };
         btnCancel.FlatAppearance.BorderSize = 0;
-        btnCancel.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
+        btnCancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
+        main.Controls.Add(btnCancel);
 
-        // Add all controls
-        mainPanel.Controls.AddRange(new Control[]
-        {
-            lblUsername, txtUsername,
-            lblPassword, txtPassword,
-            lblConfirmPassword, txtConfirmPassword,
-            lblFullName, txtFullName,
-            lblEmail, txtEmail,
-            lblPhone, txtPhone,
-            lblRole, cmbRole,
-            chkIsActive,
-            btnSave, btnCancel
-        });
-
-        this.Controls.Add(mainPanel);
+        Controls.Add(main);
+        Height = y + 120;
     }
 
+    // ── تحميل الأدوار بـ fresh context ─────────────────
     private void LoadRoles()
     {
-        var roles = _context.Roles.OrderBy(r => r.RoleName).ToList();
+        using var db = _dbFactory.CreateDbContext();
+        var roles = db.Roles
+                      .OrderBy(r => r.RoleName)
+                      .Select(r => new { r.RoleId, r.RoleName })
+                      .ToList();
+
+        cmbRole.DataSource    = null;
         cmbRole.DisplayMember = "RoleName";
-        cmbRole.ValueMember = "RoleId";
-        cmbRole.DataSource = roles;
+        cmbRole.ValueMember   = "RoleId";
+        cmbRole.DataSource    = roles;
     }
 
+    // ── تحميل بيانات المستخدم ──────────────────────────
     private void LoadUser()
     {
-        _user = _context.Users
-            .Include(u => u.Role)
-            .FirstOrDefault(u => u.UserId == _userId);
+        using var db = _dbFactory.CreateDbContext();
+        var user = db.Users.AsNoTracking()
+                     .FirstOrDefault(u => u.UserId == _userId!.Value);
+        if (user == null) return;
 
-        if (_user != null)
-        {
-            txtUsername.Text = _user.Username;
-            txtFullName.Text = _user.FullName;
-            txtEmail.Text = _user.Email ?? "";
-            txtPhone.Text = _user.Phone ?? "";
-            chkIsActive.Checked = _user.IsActive;
+        txtUsername.Text    = user.Username;
+        txtFullName.Text    = user.FullName;
+        txtEmail.Text       = user.Email  ?? string.Empty;
+        txtPhone.Text       = user.Phone  ?? string.Empty;
+        chkIsActive.Checked = user.IsActive;
 
-            if (_user.RoleId.HasValue)
-            {
-                cmbRole.SelectedValue = _user.RoleId.Value;
-            }
-        }
+        if (user.RoleId.HasValue)
+            cmbRole.SelectedValue = user.RoleId.Value;
     }
 
+    // ── حفظ ─────────────────────────────────────────────
     private void BtnSave_Click(object? sender, EventArgs e)
     {
-        // Validation
         if (string.IsNullOrWhiteSpace(txtUsername.Text))
-        {
-            MessageBox.Show("الرجاء إدخال اسم المستخدم", "تنبيه", 
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            txtUsername.Focus();
-            return;
-        }
+        { Warn("الرجاء إدخال اسم المستخدم", txtUsername); return; }
 
         if (string.IsNullOrWhiteSpace(txtFullName.Text))
-        {
-            MessageBox.Show("الرجاء إدخال الاسم الكامل", "تنبيه", 
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            txtFullName.Focus();
-            return;
-        }
+        { Warn("الرجاء إدخال الاسم الكامل", txtFullName); return; }
 
         if (cmbRole.SelectedValue == null)
-        {
-            MessageBox.Show("الرجاء اختيار الدور الوظيفي", "تنبيه", 
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            cmbRole.Focus();
-            return;
-        }
+        { Warn("الرجاء اختيار الدور الوظيفي", cmbRole); return; }
 
-        // Password validation (for new user or if password is being changed)
-        if (!_userId.HasValue || !string.IsNullOrWhiteSpace(txtPassword.Text))
+        bool isNew      = !_userId.HasValue;
+        bool changePass = !string.IsNullOrWhiteSpace(txtPassword.Text);
+
+        if (isNew || changePass)
         {
             if (string.IsNullOrWhiteSpace(txtPassword.Text))
-            {
-                MessageBox.Show("الرجاء إدخال كلمة المرور", "تنبيه", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtPassword.Focus();
-                return;
-            }
+            { Warn("الرجاء إدخال كلمة المرور", txtPassword); return; }
 
             if (txtPassword.Text.Length < 6)
-            {
-                MessageBox.Show("كلمة المرور يجب أن تكون 6 أحرف على الأقل", "تنبيه", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtPassword.Focus();
-                return;
-            }
+            { Warn("كلمة المرور يجب أن تكون 6 أحرف على الأقل", txtPassword); return; }
 
             if (txtPassword.Text != txtConfirmPassword.Text)
-            {
-                MessageBox.Show("كلمة المرور وتأكيد كلمة المرور غير متطابقين", "تنبيه", 
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txtConfirmPassword.Focus();
-                return;
-            }
-        }
-
-        // Check username uniqueness
-        var existingUser = _context.Users.FirstOrDefault(u => 
-            u.Username.ToLower() == txtUsername.Text.Trim().ToLower() && 
-            u.UserId != _userId);
-
-        if (existingUser != null)
-        {
-            MessageBox.Show("اسم المستخدم موجود بالفعل، الرجاء اختيار اسم آخر", "تنبيه", 
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            txtUsername.Focus();
-            return;
+            { Warn("كلمة المرور وتأكيدها غير متطابقين", txtConfirmPassword); return; }
         }
 
         try
         {
-            if (_userId.HasValue)
-            {
-                // Update existing user
-                if (_user != null)
-                {
-                    _user.Username = txtUsername.Text.Trim();
-                    _user.FullName = txtFullName.Text.Trim();
-                    _user.Email = string.IsNullOrWhiteSpace(txtEmail.Text) ? null : txtEmail.Text.Trim();
-                    _user.Phone = string.IsNullOrWhiteSpace(txtPhone.Text) ? null : txtPhone.Text.Trim();
-                    _user.RoleId = (int)cmbRole.SelectedValue;
-                    _user.IsActive = chkIsActive.Checked;
-                    _user.UpdatedAt = DateTime.UtcNow;
+            using var db = _dbFactory.CreateDbContext();
 
-                    // Update password if provided
-                    if (!string.IsNullOrWhiteSpace(txtPassword.Text))
-                    {
-                        _user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(txtPassword.Text);
-                    }
-                }
+            // استخراج القيمة قبل الـ query لتجنب مشكلة Nullable comparison في EF
+            int currentId = _userId ?? -1;
+
+            bool duplicate = db.Users.Any(u =>
+                u.Username.ToLower() == txtUsername.Text.Trim().ToLower() &&
+                u.UserId != currentId);
+
+            if (duplicate)
+            { Warn("اسم المستخدم موجود بالفعل، الرجاء اختيار اسم آخر", txtUsername); return; }
+
+            int roleId = Convert.ToInt32(cmbRole.SelectedValue);
+
+            if (isNew)
+            {
+                db.Users.Add(new User
+                {
+                    Username     = txtUsername.Text.Trim(),
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(txtPassword.Text),
+                    FullName     = txtFullName.Text.Trim(),
+                    Email        = Nullify(txtEmail.Text),
+                    Phone        = Nullify(txtPhone.Text),
+                    RoleId       = roleId,
+                    IsActive     = chkIsActive.Checked,
+                    CreatedAt    = DateTime.UtcNow,
+                    UpdatedAt    = DateTime.UtcNow,
+                });
             }
             else
             {
-                // Create new user
-                var newUser = new User
-                {
-                    Username = txtUsername.Text.Trim(),
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(txtPassword.Text),
-                    FullName = txtFullName.Text.Trim(),
-                    Email = string.IsNullOrWhiteSpace(txtEmail.Text) ? null : txtEmail.Text.Trim(),
-                    Phone = string.IsNullOrWhiteSpace(txtPhone.Text) ? null : txtPhone.Text.Trim(),
-                    RoleId = (int)cmbRole.SelectedValue,
-                    IsActive = chkIsActive.Checked,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
+                // استرجاع المستخدم بنفس الـ context لضمان الـ tracking
+                var user = db.Users.Find(_userId!.Value);
+                if (user == null)
+                { ShowError("لم يتم العثور على المستخدم"); return; }
 
-                _context.Users.Add(newUser);
+                user.Username  = txtUsername.Text.Trim();
+                user.FullName  = txtFullName.Text.Trim();
+                user.Email     = Nullify(txtEmail.Text);
+                user.Phone     = Nullify(txtPhone.Text);
+                user.RoleId    = roleId;
+                user.IsActive  = chkIsActive.Checked;
+                user.UpdatedAt = DateTime.UtcNow;
+
+                if (changePass)
+                    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(txtPassword.Text);
             }
 
-            _context.SaveChanges();
-            this.DialogResult = DialogResult.OK;
-            this.Close();
+            db.SaveChanges();
+            DialogResult = DialogResult.OK;
+            Close();
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"حدث خطأ أثناء حفظ المستخدم: {ex.Message}", 
-                "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            ShowError($"حدث خطأ أثناء الحفظ:\n{ex.InnerException?.Message ?? ex.Message}");
         }
     }
+
+    private static string? Nullify(string s) =>
+        string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private void Warn(string msg, Control? focus = null)
+    {
+        MessageBox.Show(msg, "تنبيه", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        focus?.Focus();
+    }
+
+    private void ShowError(string msg) =>
+        MessageBox.Show(msg, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
 }

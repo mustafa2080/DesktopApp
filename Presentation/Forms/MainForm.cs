@@ -207,6 +207,9 @@ public partial class MainForm : Form
         _header = new HeaderControl(_currentUserName);
         _header.LogoutClicked += Header_LogoutClicked;
         _header.InitializeServices(reservationService, invoiceService);
+        // 🔔 ربط نظام الإشعارات بالـ Header
+        var notificationService = _serviceProvider.GetRequiredService<INotificationService>();
+        _header.InitializeNotifications(notificationService);
         mainLayout.Controls.Add(_header, 1, 0);
 
         // Create Content Panel
@@ -244,23 +247,28 @@ public partial class MainForm : Form
         
         try
         {
-            var reservationService = _serviceProvider.GetRequiredService<IReservationService>();
-            var cashBoxService = _serviceProvider.GetRequiredService<ICashBoxService>();
-            var customerService = _serviceProvider.GetRequiredService<ICustomerService>();
-            var invoiceService = _serviceProvider.GetRequiredService<IInvoiceService>();
-            var tripService = _serviceProvider.GetRequiredService<ITripService>();
-            var umrahService = _serviceProvider.GetRequiredService<IUmrahService>();
-            var supplierService = _serviceProvider.GetRequiredService<ISupplierService>();
-            
-            _dashboard = new DashboardControl(
-                reservationService, 
-                cashBoxService, 
-                customerService, 
-                invoiceService,
-                tripService,
-                umrahService,
-                supplierService);
-            _dashboard.Dock = DockStyle.Fill;
+            // إعادة استخدام نسخة الداشبورد بدلاً من إنشاء نسخة جديدة كل مرة
+            if (_dashboard == null || _dashboard.IsDisposed)
+            {
+                var reservationService = _serviceProvider.GetRequiredService<IReservationService>();
+                var cashBoxService = _serviceProvider.GetRequiredService<ICashBoxService>();
+                var customerService = _serviceProvider.GetRequiredService<ICustomerService>();
+                var invoiceService = _serviceProvider.GetRequiredService<IInvoiceService>();
+                var tripService = _serviceProvider.GetRequiredService<ITripService>();
+                var umrahService = _serviceProvider.GetRequiredService<IUmrahService>();
+                var supplierService = _serviceProvider.GetRequiredService<ISupplierService>();
+                
+                _dashboard = new DashboardControl(
+                    reservationService, 
+                    cashBoxService, 
+                    customerService, 
+                    invoiceService,
+                    tripService,
+                    umrahService,
+                    supplierService,
+                    _serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>());
+                _dashboard.Dock = DockStyle.Fill;
+            }
             _contentPanel.Controls.Add(_dashboard);
         }
         catch (Exception ex)
@@ -604,9 +612,9 @@ public partial class MainForm : Form
         
         try
         {
-            var dbContext = _serviceProvider.GetRequiredService<AppDbContext>();
+            var dbFactory = _serviceProvider.GetRequiredService<IDbContextFactory<AppDbContext>>();
             
-            var userManagementForm = new Admin.UserManagementForm(dbContext)
+            var userManagementForm = new Admin.UserManagementForm(dbFactory)
             {
                 TopLevel = false,
                 FormBorderStyle = FormBorderStyle.None,

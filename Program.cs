@@ -189,6 +189,16 @@ static class Program
         services.AddTransient<FileManagerService>();
         services.AddTransient<IFileManagerService>(sp => sp.GetRequiredService<FileManagerService>());
 
+        // 🔔 Notification Service — Singleton حتى يحتفظ بالـ cache
+        services.AddSingleton<NotificationService>();
+        services.AddSingleton<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
+
+        // 💾 Auto Backup Service — Singleton يعيش طول عمر التطبيق
+        services.AddSingleton<AutoBackupService>();
+
+        // 🍞 Windows Toast Notifications — Singleton
+        services.AddSingleton<WindowsToastService>();
+
         // Forms
         services.AddTransient<LoginForm>();
         services.AddTransient<RegisterForm>();
@@ -209,6 +219,21 @@ static class Program
 
         // ✅ تم إزالة Circular Dependency workarounds - الآن يستخدم Lazy<T> injection
         SessionManager.Instance.Initialize(ServiceProvider);
+
+        // 🍞 تهيئة Toast Notifications
+        var toast = ServiceProvider.GetRequiredService<WindowsToastService>();
+        toast.Initialize();
+
+        // 💾 تشغيل النسخ الاحتياطي التلقائي + ربطه بـ Toast
+        var autoBackup = ServiceProvider.GetRequiredService<AutoBackupService>();
+        autoBackup.BackupCompleted += (_, msg) => toast.NotifyBackupSuccess(msg, "");
+        autoBackup.BackupFailed    += (_, err) => toast.NotifyBackupFailed(err);
+        autoBackup.Start();
+
+        // 🔔 ربط NotificationService بـ Toast (رحلات + خزنة + فواتير)
+        var notifSvc = ServiceProvider.GetRequiredService<INotificationService>();
+        notifSvc.NotificationsRefreshed += (_, notes) => SendCriticalToasts(notes, toast);
+
         AppLogger.Info("All services registered successfully.");
     }
 
@@ -285,6 +310,25 @@ static class Program
                           $"رمز الخطأ: {ex.GetType().Name}";
 
         MessageBox.Show(userMessage, "خطأ فادح", MessageBoxButtons.OK, MessageBoxIcon.Error);
+    }
+
+    // ══════════════════════════════════════════════════════
+    // يُرسل Toast فقط للإشعارات الخطيرة (Danger) عشان مش يزعج
+    // ══════════════════════════════════════════════════════
+    private static readonly HashSet<string> _sentToasts = new();
+
+    private static void SendCriticalToasts(
+        List<AppNotification> notes,
+        WindowsToastService   toast)
+    {
+        foreach (var n in notes.Where(x => x.Type == NotificationType.Danger))
+        {
+            // نتجنب تكرار نفس الإشعار
+            var key = $"{n.Title}|{n.Message}";
+            if (!_sentToasts.Add(key)) continue;
+
+            toast.ShowDanger(n.Title, n.Message);
+        }
     }
 
     private static void Application_ThreadException(object sender, System.Threading.ThreadExceptionEventArgs e)

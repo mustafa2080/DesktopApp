@@ -12,21 +12,21 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
         private readonly AppDbContext _context;
         private readonly int _currentUserId;
 
-        private ComboBox cmbTransferType;
-        private ComboBox cmbSourceBank;
-        private ComboBox cmbSourceCashBox;
-        private ComboBox cmbDestinationBank;
-        private ComboBox cmbDestinationCashBox;
-        private TextBox txtAmount;
-        private TextBox txtReferenceNumber;
-        private DateTimePicker dtpTransferDate;
-        private TextBox txtNotes;
-        private Button btnTransfer;
-        private Button btnCancel;
-        private Label lblSourceBalance;
-        private Label lblDestinationBalance;
-        private Panel sourcePanel;
-        private Panel destinationPanel;
+        private ComboBox cmbTransferType = null!;
+        private ComboBox cmbSourceBank = null!;
+        private ComboBox cmbSourceCashBox = null!;
+        private ComboBox cmbDestinationBank = null!;
+        private ComboBox cmbDestinationCashBox = null!;
+        private TextBox txtAmount = null!;
+        private TextBox txtReferenceNumber = null!;
+        private DateTimePicker dtpTransferDate = null!;
+        private TextBox txtNotes = null!;
+        private Button btnTransfer = null!;
+        private Button btnCancel = null!;
+        private Label lblSourceBalance = null!;
+        private Label lblDestinationBalance = null!;
+        private Panel sourcePanel = null!;
+        private Panel destinationPanel = null!;
 
         public BankTransferForm(AppDbContext context, int currentUserId)
         {

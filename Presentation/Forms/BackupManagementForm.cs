@@ -7,16 +7,16 @@ namespace GraceWay.AccountingSystem.Presentation.Forms;
 public partial class BackupManagementForm : Form
 {
     private readonly IBackupService _backupService;
-    private DataGridView dgvBackups;
-    private Button btnCreateBackup;
-    private Button btnRestoreBackup;
-    private Button btnDeleteBackup;
-    private Button btnRefresh;
-    private Label lblBackupPath;
-    private TextBox txtBackupPath;
-    private Button btnBrowse;
-    private GroupBox grpBackupList;
-    private GroupBox grpActions;
+    private DataGridView dgvBackups = null!;
+    private Button btnCreateBackup = null!;
+    private Button btnRestoreBackup = null!;
+    private Button btnDeleteBackup = null!;
+    private Button btnRefresh = null!;
+    private Label lblBackupPath = null!;
+    private TextBox txtBackupPath = null!;
+    private Button btnBrowse = null!;
+    private GroupBox grpBackupList = null!;
+    private GroupBox grpActions = null!;
 
     public BackupManagementForm(IBackupService backupService)
     {

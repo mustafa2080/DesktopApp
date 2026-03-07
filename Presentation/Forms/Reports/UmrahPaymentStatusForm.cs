@@ -9,7 +9,7 @@ namespace GraceWay.AccountingSystem.Presentation.Forms.Reports;
 public partial class UmrahPaymentStatusForm : Form
 {
     private readonly IUmrahService _umrahService;
-    private DataGridView _statusGrid;
+    private DataGridView _statusGrid = null!;
     private Panel _summaryPanel = null!;
     private List<UmrahPackage> _allPackages = new();
     

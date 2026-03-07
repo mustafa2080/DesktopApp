@@ -29,6 +29,12 @@ public interface IExportService
     Task<bool> ExportHtmlToPdfAsync(string html, string fileName);
     
     /// <summary>
+    /// تصدير DataTable مباشرة إلى PDF (FastReport)
+    /// </summary>
+    Task<bool> ExportDataTableToPdfAsync(DataTable dataTable, string fileName, string title,
+        Dictionary<string, string>? metadata = null);
+
+    /// <summary>
     /// إنشاء HTML من DataGridView
     /// </summary>
     string CreateHtmlFromDataGridView(DataGridView dataGridView, string title, 

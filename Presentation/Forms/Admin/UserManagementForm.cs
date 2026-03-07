@@ -10,20 +10,20 @@ namespace GraceWay.AccountingSystem.Presentation.Forms.Admin;
 
 public partial class UserManagementForm : Form
 {
-    private readonly AppDbContext _context;
-    private DataGridView dgvUsers;
-    private Button btnAdd;
-    private Button btnEdit;
-    private Button btnDelete;
-    private Button btnRefresh;
-    private Button btnChangePassword;
-    private TextBox txtSearch;
-    private ComboBox cmbRoleFilter;
-    private CheckBox chkShowInactive;
+    private readonly IDbContextFactory<AppDbContext> _dbFactory;
+    private DataGridView dgvUsers = null!;
+    private Button btnAdd = null!;
+    private Button btnEdit = null!;
+    private Button btnDelete = null!;
+    private Button btnRefresh = null!;
+    private Button btnChangePassword = null!;
+    private TextBox txtSearch = null!;
+    private ComboBox cmbRoleFilter = null!;
+    private CheckBox chkShowInactive = null!;
 
-    public UserManagementForm(AppDbContext context)
+    public UserManagementForm(IDbContextFactory<AppDbContext> dbFactory)
     {
-        _context = context;
+        _dbFactory = dbFactory;
         InitializeComponent();
         LoadData();
     }
@@ -246,21 +246,19 @@ public partial class UserManagementForm : Form
 
     private void LoadRoles()
     {
-        var roles = _context.Roles.OrderBy(r => r.RoleName).ToList();
+        using var db = _dbFactory.CreateDbContext();
+        var roles = db.Roles.OrderBy(r => r.RoleName).ToList();
         cmbRoleFilter.Items.Clear();
         cmbRoleFilter.Items.Add("الكل");
         foreach (var role in roles)
-        {
             cmbRoleFilter.Items.Add(role.RoleName);
-        }
         cmbRoleFilter.SelectedIndex = 0;
     }
 
     private void LoadData()
     {
-        var query = _context.Users
-            .Include(u => u.Role)
-            .AsQueryable();
+        using var db = _dbFactory.CreateDbContext();
+        var query = db.Users.Include(u => u.Role).AsQueryable();
 
         // Filter by search
         if (!string.IsNullOrWhiteSpace(txtSearch.Text))
@@ -307,7 +305,7 @@ public partial class UserManagementForm : Form
 
     private void BtnAdd_Click(object? sender, EventArgs e)
     {
-        var form = new AddEditUserForm(_context);
+        var form = new AddEditUserForm(_dbFactory);
         if (form.ShowDialog() == DialogResult.OK)
         {
             LoadData();
@@ -326,7 +324,7 @@ public partial class UserManagementForm : Form
         }
 
         var userId = (int)dgvUsers.SelectedRows[0].Cells["UserId"].Value;
-        var form = new AddEditUserForm(_context, userId);
+        var form = new AddEditUserForm(_dbFactory, userId);
         if (form.ShowDialog() == DialogResult.OK)
         {
             LoadData();
@@ -344,10 +342,10 @@ public partial class UserManagementForm : Form
             return;
         }
 
-        var userId = (int)dgvUsers.SelectedRows[0].Cells["UserId"].Value;
-        var username = dgvUsers.SelectedRows[0].Cells["Username"].Value.ToString();
+        var userId2 = (int)dgvUsers.SelectedRows[0].Cells["UserId"].Value;
+        var username2 = dgvUsers.SelectedRows[0].Cells["Username"].Value?.ToString() ?? "";
         
-        var form = new ChangePasswordForm(_context, userId, username!);
+        var form = new ChangePasswordForm(_dbFactory, userId2, username2);
         if (form.ShowDialog() == DialogResult.OK)
         {
             MessageBox.Show("تم تغيير كلمة المرور بنجاح", "نجاح", 
@@ -365,11 +363,11 @@ public partial class UserManagementForm : Form
         }
 
         var userId = (int)dgvUsers.SelectedRows[0].Cells["UserId"].Value;
-        var username = dgvUsers.SelectedRows[0].Cells["Username"].Value.ToString();
+        var username = dgvUsers.SelectedRows[0].Cells["Username"].Value?.ToString() ?? "";
 
         var result = MessageBox.Show(
-            $"هل أنت متأكد من حذف المستخدم '{username}'؟\n\nملاحظة: سيتم تعطيل المستخدم وليس حذفه نهائياً", 
-            "تأكيد الحذف",
+            $"هل أنت متأكد من تعطيل المستخدم '{username}'؟\n\nملاحظة: سيتم تعطيل المستخدم وليس حذفه نهائياً", 
+            "تأكيد",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning
         );
@@ -378,12 +376,13 @@ public partial class UserManagementForm : Form
         {
             try
             {
-                var user = _context.Users.Find(userId);
+                using var db = _dbFactory.CreateDbContext();
+                var user = db.Users.Find(userId);
                 if (user != null)
                 {
-                    user.IsActive = false;
+                    user.IsActive  = false;
                     user.UpdatedAt = DateTime.UtcNow;
-                    _context.SaveChanges();
+                    db.SaveChanges();
                     LoadData();
                     MessageBox.Show("تم تعطيل المستخدم بنجاح", "نجاح", 
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -391,7 +390,7 @@ public partial class UserManagementForm : Form
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"حدث خطأ أثناء حذف المستخدم: {ex.Message}", 
+                MessageBox.Show($"حدث خطأ: {ex.Message}", 
                     "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

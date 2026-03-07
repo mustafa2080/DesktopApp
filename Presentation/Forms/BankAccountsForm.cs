@@ -14,14 +14,14 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
     {
         private readonly AppDbContext _context;
         private readonly int _currentUserId;
-        private DataGridView dgvBanks;
-        private Button btnAdd;
-        private Button btnEdit;
-        private Button btnDelete;
-        private Button btnTransfer;
-        private Button btnRefresh;
-        private TextBox txtSearch;
-        private Label lblTotalBalance;
+        private DataGridView dgvBanks = null!;
+        private Button btnAdd = null!;
+        private Button btnEdit = null!;
+        private Button btnDelete = null!;
+        private Button btnTransfer = null!;
+        private Button btnRefresh = null!;
+        private TextBox txtSearch = null!;
+        private Label lblTotalBalance = null!;
 
         public BankAccountsForm(AppDbContext context, int currentUserId)
         {

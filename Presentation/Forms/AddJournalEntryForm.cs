@@ -10,16 +10,16 @@ public partial class AddJournalEntryForm : Form
     private readonly int _currentUserId;
     private JournalEntry? _existingEntry;  // ✅ للتعديل
     private bool _isEditMode = false;  // ✅ وضع التعديل
-    private DateTimePicker dtpEntryDate;
-    private TextBox txtDescription;
-    private DataGridView dgvLines;
-    private Button btnAddLine;
-    private Button btnRemoveLine;
-    private Button btnSave;
-    private Button btnCancel;
-    private Label lblDebitTotal;
-    private Label lblCreditTotal;
-    private Label lblDifference;
+    private DateTimePicker dtpEntryDate = null!;
+    private TextBox txtDescription = null!;
+    private DataGridView dgvLines = null!;
+    private Button btnAddLine = null!;
+    private Button btnRemoveLine = null!;
+    private Button btnSave = null!;
+    private Button btnCancel = null!;
+    private Label lblDebitTotal = null!;
+    private Label lblCreditTotal = null!;
+    private Label lblDifference = null!;
     private List<JournalLineItem> _lines = new List<JournalLineItem>();
 
     // Constructor للإضافة

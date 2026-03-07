@@ -12,16 +12,16 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
         private readonly int _currentUserId;
         private readonly int? _bankId;
         
-        private TextBox txtBankName;
-        private TextBox txtAccountNumber;
-        private ComboBox cmbAccountType;
-        private TextBox txtBalance;
-        private ComboBox cmbCurrency;
-        private TextBox txtBranch;
-        private CheckBox chkIsActive;
-        private TextBox txtNotes;
-        private Button btnSave;
-        private Button btnCancel;
+        private TextBox txtBankName = null!;
+        private TextBox txtAccountNumber = null!;
+        private ComboBox cmbAccountType = null!;
+        private TextBox txtBalance = null!;
+        private ComboBox cmbCurrency = null!;
+        private TextBox txtBranch = null!;
+        private CheckBox chkIsActive = null!;
+        private TextBox txtNotes = null!;
+        private Button btnSave = null!;
+        private Button btnCancel = null!;
 
         public AddEditBankAccountForm(AppDbContext context, int currentUserId, int? bankId = null)
         {
@@ -241,14 +241,14 @@ namespace GraceWay.AccountingSystem.Presentation.Forms
             }
         }
 
-        private void BtnSave_Click(object sender, EventArgs e)
+        private void BtnSave_Click(object? sender, EventArgs e)
         {
             if (!ValidateInputs())
                 return;
 
             try
             {
-                Domain.Entities.BankAccount bank;
+                Domain.Entities.BankAccount? bank;
 
                 if (_bankId.HasValue)
                 {

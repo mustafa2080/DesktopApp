@@ -1,590 +1,617 @@
-﻿using System.Drawing.Drawing2D;
+using System.Drawing.Drawing2D;
 using GraceWay.AccountingSystem.Application.Services;
+using GraceWay.AccountingSystem.Presentation;
 
 namespace GraceWay.AccountingSystem.Presentation.Controls;
 
+/// <summary>
+/// شريط العنوان العلوي
+///   يسار  : شعار + اسم النظام
+///   وسط   : 3 بطاقات إحصائية (مستحق / فواتير / حجوزات)
+///   يمين  : ساعة | جرس الإشعارات | اسم المستخدم | زر الخروج
+/// </summary>
 public class HeaderControl : Panel
 {
-    public event EventHandler? LogoutClicked;
+    // ══════════════════════════════════════════════════
+    // Events
+    // ══════════════════════════════════════════════════
+    public event EventHandler?         LogoutClicked;
+    public event EventHandler<string>? NavigateRequested;
 
+    // ══════════════════════════════════════════════════
+    // Private fields
+    // ══════════════════════════════════════════════════
     private readonly string _userName;
-    private System.Windows.Forms.Timer? _timeTimer;
-    
-    private Label? _lblTodayRevenue;
-    private Label? _lblPendingInvoices;
-    private Label? _lblActiveReservations;
-    
-    private IReservationService? _reservationService;
-    private IInvoiceService? _invoiceService;
 
+    private IReservationService?  _reservationService;
+    private IInvoiceService?      _invoiceService;
+    private INotificationService? _notificationService;
+
+    private System.Windows.Forms.Timer? _clockTimer;
+    private System.Windows.Forms.Timer? _notifTimer;
+
+    // stat value labels (centre of each card)
+    private Label? _valRevenue;
+    private Label? _valInvoices;
+    private Label? _valReservations;
+
+    // stat card panels (needed for repositioning)
+    private readonly List<Panel> _statCards = new();
+
+    // right-side controls
+    private Label?  _lblClock;
+    private Label?  _lblDate;
+    private Panel?  _bellPanel;
+    private Label?  _bellBadge;
+    private Panel?  _userChip;
+    private Button? _btnLogout;
+
+    // notification dropdown
+    private Panel? _dropdown;
+    private bool   _dropOpen;
+
+    // ══════════════════════════════════════════════════
+    // Layout constants
+    // ══════════════════════════════════════════════════
+    private const int HeaderH   = 70;
+    private const int CardW     = 165;
+    private const int CardH     = 48;
+    private const int CardGap   = 8;
+    private const int RightPad  = 14;
+
+    // ══════════════════════════════════════════════════
+    // Constructor
+    // ══════════════════════════════════════════════════
     public HeaderControl(string userName)
     {
         _userName = userName;
-        this.Dock = DockStyle.Fill;
-        this.BackColor = Color.White;
-        this.Padding = new Padding(0);
-        this.RightToLeft = RightToLeft.Yes;
 
-        InitializeHeader();
+        Dock        = DockStyle.Fill;
+        Height      = HeaderH;
+        BackColor   = ColorScheme.SidebarBg;
+        Padding     = new Padding(0);
+        RightToLeft = RightToLeft.Yes;
+
+        Paint += DrawBottomBorder;
+
+        BuildLeft();
+        BuildCenter();
+        BuildRight();
         StartClock();
+
+        Resize += (_, _) => RepositionAll();
     }
 
-    public void InitializeServices(IReservationService reservationService, IInvoiceService invoiceService)
+    // ══════════════════════════════════════════════════
+    // Public init
+    // ══════════════════════════════════════════════════
+    public void InitializeServices(IReservationService res, IInvoiceService inv)
     {
-        _reservationService = reservationService;
-        _invoiceService = invoiceService;
-        _ = LoadHeaderStatsAsync();
+        _reservationService = res;
+        _invoiceService     = inv;
+        _ = LoadStatsAsync();
     }
 
-    private void InitializeHeader()
+    public void InitializeNotifications(INotificationService svc)
     {
-        // Main Container with gradient background
-        Panel mainContainer = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Color.White,
-            Padding = new Padding(25, 10, 25, 10)
-        };
-        mainContainer.Paint += (s, e) =>
-        {
-            using (LinearGradientBrush brush = new LinearGradientBrush(
-                mainContainer.ClientRectangle,
-                Color.FromArgb(245, 247, 250),
-                Color.White,
-                90F))
-            {
-                e.Graphics.FillRectangle(brush, mainContainer.ClientRectangle);
-            }
-        };
+        _notificationService = svc;
+        svc.NotificationsRefreshed += (_, _) => SafeUI(RefreshBadge);
 
-        // Right Section - Company Info
-        Panel companySection = CreateCompanySection();
-        companySection.Location = new Point(25, 12);
-        mainContainer.Controls.Add(companySection);
+        _notifTimer = new System.Windows.Forms.Timer { Interval = 5 * 60_000 };
+        _notifTimer.Tick += async (_, _) => await svc.RefreshAsync();
+        _notifTimer.Start();
 
-        // Center Section - Quick Stats
-        Panel statsSection = CreateQuickStatsSection();
-        mainContainer.Controls.Add(statsSection);
-
-        // Left Section - User Info & Logout
-        Panel userSection = CreateUserSection();
-        userSection.Location = new Point(mainContainer.Width - userSection.Width - 25, 8);
-        userSection.Anchor = AnchorStyles.Top | AnchorStyles.Left;
-        mainContainer.Controls.Add(userSection);
-
-        // Handle resize to center stats
-        mainContainer.Resize += (s, e) =>
-        {
-            statsSection.Location = new Point(
-                (mainContainer.Width - statsSection.Width) / 2,
-                8
-            );
-            userSection.Location = new Point(mainContainer.Width - userSection.Width - 25, 8);
-        };
-
-        this.Controls.Add(mainContainer);
-
-        // Bottom shadow line
-        Panel shadowLine = new Panel
-        {
-            Height = 2,
-            Dock = DockStyle.Bottom,
-            BackColor = Color.FromArgb(220, 220, 225)
-        };
-        this.Controls.Add(shadowLine);
+        var once = new System.Windows.Forms.Timer { Interval = 3000 };
+        once.Tick += async (_, _) => { once.Stop(); await svc.RefreshAsync(); };
+        once.Start();
     }
 
-    private Panel CreateCompanySection()
+    // ══════════════════════════════════════════════════
+    // Build — Left: brand
+    // ══════════════════════════════════════════════════
+    private void BuildLeft()
     {
-        Panel panel = new Panel
+        // أيقونة دائرية
+        var iconPanel = new Panel
         {
-            AutoSize = true,
-            BackColor = Color.Transparent
+            Size      = new Size(42, 42),
+            BackColor = Color.Transparent,
+            Location  = new Point(14, (HeaderH - 42) / 2),
         };
-
-        // Company icon/logo circle
-        Panel logoCircle = new Panel
+        iconPanel.Paint += (_, e) =>
         {
-            Size = new Size(50, 50),
-            Location = new Point(0, 0),
-            BackColor = ColorScheme.Primary
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using var b = new SolidBrush(ColorScheme.Primary);
+            g.FillEllipse(b, 0, 0, 41, 41);
+            using var f = new Font("Segoe UI Emoji", 17F);
+            g.DrawString("💼", f, Brushes.White,
+                new RectangleF(0, 0, 42, 42),
+                new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
         };
-        logoCircle.Paint += (s, e) =>
+        Controls.Add(iconPanel);
+
+        Controls.Add(new Label
         {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = new GraphicsPath())
-            {
-                path.AddEllipse(0, 0, 50, 50);
-                e.Graphics.FillPath(new SolidBrush(ColorScheme.Primary), path);
-                
-                // Draw icon text
-                string iconText = "GW";
-                using (Font font = new Font("Cairo", 12F, FontStyle.Bold))
-                {
-                    SizeF textSize = e.Graphics.MeasureString(iconText, font);
-                    e.Graphics.DrawString(iconText, font, Brushes.White, 
-                        (50 - textSize.Width) / 2, (50 - textSize.Height) / 2);
-                }
-            }
-        };
-        panel.Controls.Add(logoCircle);
-
-        // Company name
-        Label companyName = new Label
+            Text      = "جريس واي",
+            Font      = new Font("Cairo", 12F, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize  = true,
+            Location  = new Point(64, 12),
+            BackColor = Color.Transparent,
+        });
+        Controls.Add(new Label
         {
-            Text = "شركة جراس واي",
-            Font = new Font("Cairo", 13F, FontStyle.Bold),
-            ForeColor = ColorScheme.Primary,
-            AutoSize = true,
-            Location = new Point(60, 5),
-            BackColor = Color.Transparent
-        };
-        panel.Controls.Add(companyName);
-
-        // Company subtitle
-        Label companySubtitle = new Label
-        {
-            Text = "للسياحة والسفر",
-            Font = new Font("Cairo", 9F),
-            ForeColor = ColorScheme.TextSecondary,
-            AutoSize = true,
-            Location = new Point(60, 28),
-            BackColor = Color.Transparent
-        };
-        panel.Controls.Add(companySubtitle);
-
-        panel.Width = 220;
-        panel.Height = 55;
-
-        return panel;
+            Text      = "النظام المحاسبي",
+            Font      = new Font("Cairo", 8F),
+            ForeColor = ColorScheme.WithOpacity(Color.White, 150),
+            AutoSize  = true,
+            Location  = new Point(64, 38),
+            BackColor = Color.Transparent,
+        });
     }
 
-    private Panel CreateQuickStatsSection()
+    // ══════════════════════════════════════════════════
+    // Build — Center: stat cards
+    // ══════════════════════════════════════════════════
+    private void BuildCenter()
     {
-        // 3 cards × 195px + 2 gaps × 10px = 605px
-        Panel panel = new Panel
-        {
-            Size = new Size(615, 64),
-            BackColor = Color.Transparent
-        };
-
-        var stat1 = CreateQuickStat("💰", "---", "إيرادات اليوم",
-            0,   Color.FromArgb(16, 185, 129), Color.FromArgb(5, 150, 105),   out _lblTodayRevenue);
-        var stat2 = CreateQuickStat("📄", "---", "فواتير معلقة",
-            205, Color.FromArgb(245, 101, 101), Color.FromArgb(220, 38, 38),  out _lblPendingInvoices);
-        var stat3 = CreateQuickStat("✈️", "---", "حجوزات نشطة",
-            410, Color.FromArgb(96, 165, 250), Color.FromArgb(37, 99, 235),   out _lblActiveReservations);
-
-        panel.Controls.Add(stat1);
-        panel.Controls.Add(stat2);
-        panel.Controls.Add(stat3);
-        return panel;
+        _valRevenue      = AddStatCard("💰", "مستحق",         "—",      ColorScheme.Success);
+        _valInvoices     = AddStatCard("🧾", "فواتير معلقة",  "—",      ColorScheme.Warning);
+        _valReservations = AddStatCard("📋", "حجوزات نشطة",  "—",      ColorScheme.Info);
+        PositionStatCards();
     }
 
-    private Panel CreateQuickStat(string icon, string value, string label,
-        int xPos, Color colorTop, Color colorBottom, out Label valueLabel)
+    private Label AddStatCard(string icon, string title, string value, Color accent)
     {
         var card = new Panel
         {
-            Size     = new Size(195, 64),
-            Location = new Point(xPos, 0),
+            Size      = new Size(CardW, CardH),
+            BackColor = ColorScheme.WithOpacity(Color.White, 20),
+        };
+
+        // خط علوي ملون
+        card.Paint += (_, e) =>
+        {
+            using var b = new SolidBrush(accent);
+            e.Graphics.FillRectangle(b, 0, 0, card.Width, 3);
+        };
+
+        card.Controls.Add(new Label
+        {
+            Text      = icon + "  " + title,
+            Font      = new Font("Cairo", 7.5F),
+            ForeColor = ColorScheme.WithOpacity(Color.White, 160),
+            AutoSize  = false,
+            Size      = new Size(CardW - 6, 18),
+            Location  = new Point(3, 7),
+            TextAlign = ContentAlignment.MiddleRight,
             BackColor = Color.Transparent,
-            Cursor    = Cursors.Hand,
-        };
+        });
 
-        bool hovered = false;
-
-        card.Paint += (s, e) =>
-        {
-            var g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-
-            var rect = new Rectangle(0, 0, card.Width - 1, card.Height - 1);
-            using var path = RoundedRect(rect, 12);
-
-            // Gradient fill
-            var c1 = hovered ? Lighten(colorTop, 18)    : colorTop;
-            var c2 = hovered ? Lighten(colorBottom, 12) : colorBottom;
-            using var grad = new LinearGradientBrush(rect, c1, c2,
-                LinearGradientMode.ForwardDiagonal);
-            g.FillPath(grad, path);
-
-            // Subtle inner-top white sheen
-            using var sheenPath = RoundedRect(new Rectangle(1, 1, card.Width - 3, 28), 11);
-            using var sheenBrush = new SolidBrush(Color.FromArgb(28, 255, 255, 255));
-            g.FillPath(sheenBrush, sheenPath);
-
-            // Thin white border
-            using var pen = new Pen(Color.FromArgb(55, 255, 255, 255), 1.2f);
-            g.DrawPath(pen, path);
-
-            // Bottom glow strip
-            using var stripBrush = new SolidBrush(Color.FromArgb(40, 0, 0, 0));
-            g.FillRectangle(stripBrush, 0, card.Height - 10, card.Width, 10);
-        };
-
-        // Icon box — small rounded square
-        var iconBox = new Panel
-        {
-            Size      = new Size(40, 40),
-            Location  = new Point(card.Width - 50, 12),
-            BackColor = Color.Transparent,
-        };
-        iconBox.Paint += (s, e) =>
-        {
-            var g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            using var p = RoundedRect(new Rectangle(0, 0, 40, 40), 8);
-            using var b = new SolidBrush(Color.FromArgb(55, 255, 255, 255));
-            g.FillPath(b, p);
-        };
-
-        var lblIcon = new Label
-        {
-            Text      = icon,
-            Font      = new Font("Segoe UI Emoji", 17F),
-            ForeColor = Color.White,
-            Size      = new Size(40, 40),
-            Location  = new Point(0, 0),
-            TextAlign = ContentAlignment.MiddleCenter,
-            BackColor = Color.Transparent,
-        };
-        iconBox.Controls.Add(lblIcon);
-        card.Controls.Add(iconBox);
-
-        // Value label
-        valueLabel = new Label
+        var valLbl = new Label
         {
             Text      = value,
-            Font      = new Font("Cairo", 17F, FontStyle.Bold),
+            Font      = new Font("Cairo", 10F, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize  = false,
-            Size      = new Size(130, 32),
-            Location  = new Point(6, 6),
+            Size      = new Size(CardW - 6, 20),
+            Location  = new Point(3, 25),
             TextAlign = ContentAlignment.MiddleRight,
             BackColor = Color.Transparent,
         };
-        card.Controls.Add(valueLabel);
+        card.Controls.Add(valLbl);
 
-        // Label text
-        var lblText = new Label
-        {
-            Text      = label,
-            Font      = new Font("Cairo", 8.5F, FontStyle.Regular),
-            ForeColor = Color.FromArgb(220, 255, 255, 255),
-            AutoSize  = false,
-            Size      = new Size(130, 20),
-            Location  = new Point(6, 40),
-            TextAlign = ContentAlignment.MiddleRight,
-            BackColor = Color.Transparent,
-        };
-        card.Controls.Add(lblText);
-
-        // Hover
-        void SetHover(bool on)
-        {
-            hovered = on;
-            card.Invalidate();
-        }
-        card.MouseEnter += (s, e) => SetHover(true);
-        card.MouseLeave += (s, e) => SetHover(false);
-        foreach (Control c in card.Controls)
-        {
-            c.MouseEnter += (s, e) => SetHover(true);
-            c.MouseLeave += (s, e) => SetHover(false);
-        }
-        foreach (Control c in iconBox.Controls)
-        {
-            c.MouseEnter += (s, e) => SetHover(true);
-            c.MouseLeave += (s, e) => SetHover(false);
-        }
-
-        return card;
+        _statCards.Add(card);
+        Controls.Add(card);
+        return valLbl;
     }
 
-    private static Color Lighten(Color c, int amount) =>
-        Color.FromArgb(
-            Math.Min(255, c.R + amount),
-            Math.Min(255, c.G + amount),
-            Math.Min(255, c.B + amount));
-
-    private static GraphicsPath RoundedRect(Rectangle bounds, int radius)
+    private void PositionStatCards()
     {
-        var path = new GraphicsPath();
-        int d = radius * 2;
-        path.AddArc(bounds.X,              bounds.Y,               d, d, 180, 90);
-        path.AddArc(bounds.Right - d,      bounds.Y,               d, d, 270, 90);
-        path.AddArc(bounds.Right - d,      bounds.Bottom - d,      d, d,   0, 90);
-        path.AddArc(bounds.X,              bounds.Bottom - d,      d, d,  90, 90);
-        path.CloseFigure();
-        return path;
+        if (_statCards.Count == 0) return;
+        int totalW = _statCards.Count * CardW + (_statCards.Count - 1) * CardGap;
+        int startX = (Width - totalW) / 2;
+        int cardY  = (HeaderH - CardH) / 2;
+        for (int i = 0; i < _statCards.Count; i++)
+            _statCards[i].Location = new Point(startX + i * (CardW + CardGap), cardY);
     }
 
-    private async Task LoadHeaderStatsAsync()
+    // ══════════════════════════════════════════════════
+    // Build — Right: clock + bell + user + logout
+    // ══════════════════════════════════════════════════
+    private void BuildRight()
+    {
+        // ── ساعة ──────────────────────────────────────
+        _lblClock = new Label
+        {
+            Text      = DateTime.Now.ToString("HH:mm:ss"),
+            Font      = new Font("Consolas", 13F, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize  = true,
+            BackColor = Color.Transparent,
+        };
+        Controls.Add(_lblClock);
+
+        _lblDate = new Label
+        {
+            Text      = DateTime.Now.ToString("ddd dd/MM/yyyy"),
+            Font      = new Font("Cairo", 7.5F),
+            ForeColor = ColorScheme.WithOpacity(Color.White, 150),
+            AutoSize  = true,
+            BackColor = Color.Transparent,
+        };
+        Controls.Add(_lblDate);
+
+        // ── جرس ───────────────────────────────────────
+        _bellPanel = new Panel
+        {
+            Size      = new Size(38, 38),
+            BackColor = ColorScheme.WithOpacity(Color.White, 22),
+            Cursor    = Cursors.Hand,
+        };
+        _bellPanel.Paint += (_, e) =>
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var b = new SolidBrush(_bellPanel.BackColor);
+            e.Graphics.FillEllipse(b, 0, 0, 37, 37);
+            using var f = new Font("Segoe UI Emoji", 15F);
+            e.Graphics.DrawString("🔔", f, Brushes.White,
+                new RectangleF(0, 0, 38, 38),
+                new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+        };
+        _bellPanel.Click      += BellClick;
+        _bellPanel.MouseEnter += (_, _) => { _bellPanel.BackColor = ColorScheme.WithOpacity(Color.White, 45); _bellPanel.Invalidate(); };
+        _bellPanel.MouseLeave += (_, _) => { _bellPanel.BackColor = ColorScheme.WithOpacity(Color.White, 22); _bellPanel.Invalidate(); };
+        Controls.Add(_bellPanel);
+
+        // badge
+        _bellBadge = new Label
+        {
+            Size      = new Size(18, 18),
+            BackColor = ColorScheme.Danger,
+            ForeColor = Color.White,
+            Font      = new Font("Segoe UI", 7F, FontStyle.Bold),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Visible   = false,
+        };
+        _bellBadge.Paint += (_, e) =>
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var b = new SolidBrush(ColorScheme.Danger);
+            e.Graphics.FillEllipse(b, 0, 0, 17, 17);
+            e.Graphics.DrawString(_bellBadge!.Text, new Font("Segoe UI", 7F, FontStyle.Bold),
+                Brushes.White, new RectangleF(0, 0, 17, 17),
+                new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+        };
+        Controls.Add(_bellBadge);
+        _bellBadge.BringToFront();
+
+        // ── chip المستخدم ──────────────────────────────
+        _userChip = new Panel
+        {
+            Size      = new Size(110, 36),
+            BackColor = ColorScheme.WithOpacity(Color.White, 18),
+        };
+        _userChip.Controls.Add(new Label
+        {
+            Text      = "👤  " + TruncateName(_userName, 10),
+            Font      = new Font("Cairo", 8.5F, FontStyle.Bold),
+            ForeColor = Color.White,
+            Dock      = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter,
+            BackColor = Color.Transparent,
+        });
+        Controls.Add(_userChip);
+
+        // ── زر الخروج ──────────────────────────────────
+        _btnLogout = new Button
+        {
+            Text      = "خروج  ⏏",
+            Font      = new Font("Cairo", 9F, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = ColorScheme.Danger,
+            FlatStyle = FlatStyle.Flat,
+            Size      = new Size(88, 36),
+            Cursor    = Cursors.Hand,
+        };
+        _btnLogout.FlatAppearance.BorderSize             = 0;
+        _btnLogout.FlatAppearance.MouseOverBackColor     = ColorScheme.Darken(ColorScheme.Danger, 0.15f);
+        _btnLogout.Click += (_, _) => LogoutClicked?.Invoke(this, EventArgs.Empty);
+        Controls.Add(_btnLogout);
+
+        RepositionAll();
+    }
+
+    // ══════════════════════════════════════════════════
+    // Reposition — runs on Resize
+    // ══════════════════════════════════════════════════
+    private void RepositionAll()
+    {
+        if (Width < 10) return;
+
+        PositionStatCards();
+
+        int x = Width - RightPad;
+
+        // logout
+        if (_btnLogout != null)
+        {
+            x -= _btnLogout.Width;
+            _btnLogout.Location = new Point(x, (HeaderH - _btnLogout.Height) / 2);
+            x -= 10;
+        }
+
+        // user chip
+        if (_userChip != null)
+        {
+            x -= _userChip.Width;
+            _userChip.Location = new Point(x, (HeaderH - _userChip.Height) / 2);
+            x -= 10;
+        }
+
+        // bell
+        if (_bellPanel != null)
+        {
+            x -= _bellPanel.Width;
+            _bellPanel.Location = new Point(x, (HeaderH - _bellPanel.Height) / 2);
+
+            if (_bellBadge != null)
+                _bellBadge.Location = new Point(_bellPanel.Right - 10, _bellPanel.Top - 4);
+
+            x -= 14;
+        }
+
+        // separator space
+        x -= 10;
+
+        // clock & date (right-aligned to current x)
+        if (_lblClock != null)
+        {
+            _lblClock.Location = new Point(x - _lblClock.PreferredWidth, 10);
+        }
+        if (_lblDate != null)
+        {
+            _lblDate.Location = new Point(x - _lblDate.PreferredWidth, 40);
+        }
+    }
+
+    // ══════════════════════════════════════════════════
+    // Clock
+    // ══════════════════════════════════════════════════
+    private void StartClock()
+    {
+        _clockTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+        _clockTimer.Tick += (_, _) => SafeUI(() =>
+        {
+            if (_lblClock != null) _lblClock.Text = DateTime.Now.ToString("HH:mm:ss");
+            if (_lblDate  != null) _lblDate.Text  = DateTime.Now.ToString("ddd dd/MM/yyyy");
+        });
+        _clockTimer.Start();
+    }
+
+    // ══════════════════════════════════════════════════
+    // Stats
+    // ══════════════════════════════════════════════════
+    private async Task LoadStatsAsync()
     {
         try
         {
-            // ⚠️ DbContext غير thread-safe - sequential queries
-            var today = DateTime.Today;
-
-            if (_reservationService != null)
-            {
-                var stats = await _reservationService.GetReservationStatisticsAsync(today, today.AddDays(1));
-                var todayRevenue = stats.GetValueOrDefault("TotalSales", 0m);
-                var allReservations = await _reservationService.GetAllReservationsAsync();
-                var activeCount = allReservations?.Count(r => r.Status == "Confirmed" || r.Status == "Pending") ?? 0;
-                SafeUpdateUI(() =>
-                {
-                    if (_lblTodayRevenue != null) _lblTodayRevenue.Text = FormatCurrency(todayRevenue);
-                    if (_lblActiveReservations != null) _lblActiveReservations.Text = activeCount.ToString();
-                });
-            }
-
             if (_invoiceService != null)
             {
-                var salesInvoices    = await _invoiceService.GetUnpaidSalesInvoicesAsync();
-                var purchaseInvoices = await _invoiceService.GetUnpaidPurchaseInvoicesAsync();
-                var pendingCount = (salesInvoices?.Count ?? 0) + (purchaseInvoices?.Count ?? 0);
-                SafeUpdateUI(() => { if (_lblPendingInvoices != null) _lblPendingInvoices.Text = pendingCount.ToString(); });
+                var unpaid = await _invoiceService.GetUnpaidSalesInvoicesAsync();
+                SafeUI(() =>
+                {
+                    if (_valRevenue  != null) _valRevenue.Text  = $"{unpaid.Sum(i => i.RemainingAmount):N0} ج.م";
+                    if (_valInvoices != null) _valInvoices.Text = $"{unpaid.Count}";
+                });
+            }
+            if (_reservationService != null)
+            {
+                var all    = await _reservationService.GetAllReservationsAsync();
+                int active = all.Count(r => r.Status != "Cancelled" && r.Status != "Completed");
+                SafeUI(() =>
+                {
+                    if (_valReservations != null) _valReservations.Text = $"{active}";
+                });
             }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"❌ Error loading header stats: {ex.Message}");
-            GraceWay.AccountingSystem.Infrastructure.Logging.AppLogger.Error("Error loading header stats", ex);
-        }
+        catch { /* تجاهل */ }
     }
 
-    private void SafeUpdateUI(Action action)
+    // ══════════════════════════════════════════════════
+    // Notification badge
+    // ══════════════════════════════════════════════════
+    private void RefreshBadge()
     {
-        if (InvokeRequired)
+        if (_notificationService == null || _bellPanel == null || _bellBadge == null) return;
+        int cnt = _notificationService.UnreadCount;
+        _bellBadge.Visible  = cnt > 0;
+        _bellBadge.Text     = cnt > 9 ? "9+" : cnt.ToString();
+        _bellBadge.Location = new Point(_bellPanel.Right - 10, _bellPanel.Top - 4);
+        _bellBadge.Invalidate();
+    }
+
+    // ══════════════════════════════════════════════════
+    // Notification dropdown
+    // ══════════════════════════════════════════════════
+    private async void BellClick(object? sender, EventArgs e)
+    {
+        if (_dropOpen) { CloseDropdown(); return; }
+        if (_notificationService == null) return;
+
+        _dropOpen = true;
+        _notificationService.MarkAllRead();
+        RefreshBadge();
+
+        var notes = await _notificationService.GetAllAsync();
+        OpenDropdown(notes);
+    }
+
+    private void OpenDropdown(List<AppNotification> notes)
+    {
+        _dropdown?.Dispose();
+
+        int dropH = Math.Min(500, 52 + Math.Max(1, notes.Count) * 70 + 10);
+        _dropdown = new Panel
         {
-            try
+            Size      = new Size(390, dropH),
+            BackColor = Color.FromArgb(30, 41, 59),
+        };
+
+        // header
+        var hdr = new Panel { Dock = DockStyle.Top, Height = 48, BackColor = Color.FromArgb(15, 23, 42) };
+        hdr.Controls.Add(new Label
+        {
+            Text      = $"🔔   الإشعارات  ({notes.Count})",
+            Font      = new Font("Cairo", 10.5F, FontStyle.Bold),
+            ForeColor = Color.White,
+            Dock      = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleRight,
+            Padding   = new Padding(0, 0, 14, 0),
+            BackColor = Color.Transparent,
+        });
+        hdr.Paint += (_, e) =>
+        {
+            using var b = new SolidBrush(ColorScheme.Primary);
+            e.Graphics.FillRectangle(b, 0, hdr.Height - 3, hdr.Width, 3);
+        };
+        _dropdown.Controls.Add(hdr);
+
+        // scroll list
+        var scroll = new Panel { AutoScroll = true, Dock = DockStyle.Fill, Padding = new Padding(6, 4, 6, 4) };
+
+        if (notes.Count == 0)
+        {
+            scroll.Controls.Add(new Label
             {
-                Invoke(action);
-            }
-            catch { }
+                Text      = "✅  لا توجد إشعارات جديدة",
+                Font      = new Font("Cairo", 10F),
+                ForeColor = ColorScheme.WithOpacity(Color.White, 150),
+                AutoSize  = false, Size = new Size(360, 80),
+                Location  = new Point(6, 16),
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = Color.Transparent,
+            });
         }
         else
         {
-            action();
+            int y = 6;
+            foreach (var n in notes)
+                scroll.Controls.Add(BuildNoteRow(n, ref y));
         }
+
+        _dropdown.Controls.Add(scroll);
+
+        // position
+        var form = FindForm()!;
+        var pt   = _bellPanel!.PointToScreen(new Point(_bellPanel.Width - _dropdown.Width, _bellPanel.Height + 4));
+        _dropdown.Location = form.PointToClient(pt);
+
+        form.Controls.Add(_dropdown);
+        _dropdown.BringToFront();
+        form.MouseClick += CloseOnClickOutside;
     }
 
-    private string FormatCurrency(decimal value)
+    private Panel BuildNoteRow(AppNotification n, ref int y)
     {
-        if (value >= 1000000)
-            return $"{(value / 1000000):N1}م";
-        if (value >= 1000)
-            return $"{(value / 1000):N0}ك";
-        
-        return $"{value:N0}";
-    }
-
-    private Panel CreateUserSection()
-    {
-        Panel panel = new Panel
+        (Color accent, string icon) = n.Type switch
         {
-            Size = new Size(320, 60),
-            BackColor = Color.Transparent
+            NotificationType.Danger  => (ColorScheme.Danger,  "🔴"),
+            NotificationType.Warning => (ColorScheme.Warning, "🟠"),
+            NotificationType.Success => (ColorScheme.Success, "🟢"),
+            _                        => (ColorScheme.Info,    "🔵"),
         };
 
-        // User info card
-        Panel userCard = new Panel
+        var row = new Panel
         {
-            Size = new Size(180, 55),
-            Location = new Point(0, 0),
-            BackColor = Color.FromArgb(240, 245, 255)
+            Location  = new Point(0, y),
+            Size      = new Size(376, 62),
+            BackColor = ColorScheme.WithOpacity(Color.White, 14),
+            Cursor    = Cursors.Hand,
         };
-        userCard.Paint += (s, e) =>
+
+        Color ac = accent;
+        row.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = new GraphicsPath())
-            {
-                int radius = 12;
-                Rectangle rect = new Rectangle(0, 0, userCard.Width - 1, userCard.Height - 1);
-                path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
-                path.AddArc(rect.X + rect.Width - radius, rect.Y, radius, radius, 270, 90);
-                path.AddArc(rect.X + rect.Width - radius, rect.Y + rect.Height - radius, radius, radius, 0, 90);
-                path.AddArc(rect.X, rect.Y + rect.Height - radius, radius, radius, 90, 90);
-                path.CloseFigure();
-
-                using (SolidBrush brush = new SolidBrush(Color.FromArgb(240, 245, 255)))
-                {
-                    e.Graphics.FillPath(brush, path);
-                }
-                using (Pen pen = new Pen(Color.FromArgb(200, 210, 230), 1))
-                {
-                    e.Graphics.DrawPath(pen, path);
-                }
-            }
+            using var b   = new SolidBrush(ac);
+            e.Graphics.FillRectangle(b, row.Width - 4, 8, 4, row.Height - 16);
+            using var pen = new Pen(ColorScheme.WithOpacity(Color.White, 18), 1);
+            e.Graphics.DrawLine(pen, 8, row.Height - 1, row.Width - 8, row.Height - 1);
         };
 
-        // User avatar circle
-        Panel avatarCircle = new Panel
+        var lblTitle = new Label
         {
-            Size = new Size(38, 38),
-            Location = new Point(10, 8),
-            BackColor = ColorScheme.Primary
-        };
-        avatarCircle.Paint += (s, e) =>
-        {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = new GraphicsPath())
-            {
-                path.AddEllipse(0, 0, 38, 38);
-                using (LinearGradientBrush brush = new LinearGradientBrush(
-                    avatarCircle.ClientRectangle,
-                    ColorScheme.Primary,
-                    Color.FromArgb(ColorScheme.Primary.R + 30, ColorScheme.Primary.G + 30, ColorScheme.Primary.B + 30),
-                    45F))
-                {
-                    e.Graphics.FillPath(brush, path);
-                }
-                
-                // Draw user icon
-                string iconText = _userName.Length > 0 ? _userName.Substring(0, 1).ToUpper() : "U";
-                using (Font font = new Font("Cairo", 14F, FontStyle.Bold))
-                {
-                    SizeF textSize = e.Graphics.MeasureString(iconText, font);
-                    e.Graphics.DrawString(iconText, font, Brushes.White, 
-                        (38 - textSize.Width) / 2, (38 - textSize.Height) / 2 - 1);
-                }
-            }
-        };
-        userCard.Controls.Add(avatarCircle);
-
-        // User name
-        Label userName = new Label
-        {
-            Text = _userName,
-            Font = new Font("Cairo", 10F, FontStyle.Bold),
-            ForeColor = ColorScheme.TextPrimary,
-            AutoSize = true,
-            Location = new Point(55, 12),
-            BackColor = Color.Transparent
-        };
-        userCard.Controls.Add(userName);
-
-        // User role
-        Label userRole = new Label
-        {
-            Text = "👑 مدير النظام",
-            Font = new Font("Cairo", 8F),
-            ForeColor = ColorScheme.TextSecondary,
-            AutoSize = true,
-            Location = new Point(55, 30),
-            BackColor = Color.Transparent
-        };
-        userCard.Controls.Add(userRole);
-
-        panel.Controls.Add(userCard);
-
-        // Logout button
-        Button logoutButton = new Button
-        {
-            Text = "🚪",
-            Font = new Font("Segoe UI Emoji", 16F),
+            Text      = icon + "  " + n.Title,
+            Font      = new Font("Cairo", 9F, FontStyle.Bold),
             ForeColor = Color.White,
-            BackColor = ColorScheme.Error,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(50, 55),
-            Location = new Point(190, 0),
-            Cursor = Cursors.Hand,
-            TextAlign = ContentAlignment.MiddleCenter
+            AutoSize  = false, Size = new Size(368, 22),
+            Location  = new Point(4, 8),
+            TextAlign = ContentAlignment.MiddleRight,
+            BackColor = Color.Transparent,
         };
-        logoutButton.FlatAppearance.BorderSize = 0;
-        logoutButton.FlatAppearance.BorderColor = Color.FromArgb(0, 255, 255, 255);
-        
-        // Rounded corners for logout button
-        logoutButton.Paint += (s, e) =>
+        var lblMsg = new Label
         {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath path = new GraphicsPath())
-            {
-                int radius = 12;
-                Rectangle rect = new Rectangle(0, 0, logoutButton.Width - 1, logoutButton.Height - 1);
-                path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
-                path.AddArc(rect.X + rect.Width - radius, rect.Y, radius, radius, 270, 90);
-                path.AddArc(rect.X + rect.Width - radius, rect.Y + rect.Height - radius, radius, radius, 0, 90);
-                path.AddArc(rect.X, rect.Y + rect.Height - radius, radius, radius, 90, 90);
-                path.CloseFigure();
-
-                logoutButton.Region = new Region(path);
-            }
+            Text      = n.Message,
+            Font      = new Font("Cairo", 8F),
+            ForeColor = ColorScheme.WithOpacity(Color.White, 155),
+            AutoSize  = false, Size = new Size(368, 24),
+            Location  = new Point(4, 30),
+            TextAlign = ContentAlignment.MiddleRight,
+            BackColor = Color.Transparent,
         };
 
-        // Tooltip
-        ToolTip tooltip = new ToolTip();
-        tooltip.SetToolTip(logoutButton, "تسجيل الخروج");
+        string key = n.ActionKey;
+        EventHandler act = (_, _) => { CloseDropdown(); NavigateRequested?.Invoke(this, key); };
+        row.Click      += act;
+        lblTitle.Click += act;
+        lblMsg.Click   += act;
+        row.MouseEnter += (_, _) => { row.BackColor = ColorScheme.WithOpacity(Color.White, 28); };
+        row.MouseLeave += (_, _) => { row.BackColor = ColorScheme.WithOpacity(Color.White, 14); };
 
-        // Hover effects
-        logoutButton.MouseEnter += (s, e) =>
-        {
-            logoutButton.BackColor = Color.FromArgb(200, 50, 45);
-            logoutButton.Font = new Font("Segoe UI Emoji", 18F);
-        };
-        logoutButton.MouseLeave += (s, e) =>
-        {
-            logoutButton.BackColor = ColorScheme.Error;
-            logoutButton.Font = new Font("Segoe UI Emoji", 16F);
-        };
-
-        logoutButton.Click += (s, e) => LogoutClicked?.Invoke(this, EventArgs.Empty);
-
-        panel.Controls.Add(logoutButton);
-
-        // About button
-        Button aboutButton = new Button
-        {
-            Text = "ℹ️",
-            Font = new Font("Segoe UI Emoji", 14F),
-            ForeColor = Color.White,
-            BackColor = Color.FromArgb(52, 152, 219),
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(50, 55),
-            Location = new Point(244, 0),
-            Cursor = Cursors.Hand,
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-        aboutButton.FlatAppearance.BorderSize = 0;
-        ToolTip aboutTooltip = new ToolTip();
-        aboutTooltip.SetToolTip(aboutButton, "عن البرنامج");
-        aboutButton.Click += (s, e) =>
-        {
-            using var aboutForm = new GraceWay.AccountingSystem.Presentation.Forms.AboutForm();
-            aboutForm.ShowDialog();
-        };
-        panel.Controls.Add(aboutButton);
-        panel.Width = 305;
-
-        // Separator line
-        Panel separator = new Panel
-        {
-            Size = new Size(1, 45),
-            Location = new Point(185, 5),
-            BackColor = Color.FromArgb(220, 220, 225)
-        };
-        panel.Controls.Add(separator);
-
-        return panel;
+        row.Controls.Add(lblTitle);
+        row.Controls.Add(lblMsg);
+        y += 66;
+        return row;
     }
 
-    private void StartClock()
+    private void CloseDropdown()
     {
-        _timeTimer = new System.Windows.Forms.Timer();
-        _timeTimer.Interval = 1000;
-        _timeTimer.Tick += (s, e) => { /* Timer removed from header */ };
-        _timeTimer.Start();
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
+        _dropOpen = false;
+        var form  = FindForm();
+        if (form != null)
         {
-            _timeTimer?.Stop();
-            _timeTimer?.Dispose();
+            form.Controls.Remove(_dropdown);
+            form.MouseClick -= CloseOnClickOutside;
         }
-        base.Dispose(disposing);
+        _dropdown?.Dispose();
+        _dropdown = null;
+    }
+
+    private void CloseOnClickOutside(object? s, MouseEventArgs e)
+    {
+        if (_dropdown == null || !_dropdown.Bounds.Contains(e.Location))
+            CloseDropdown();
+    }
+
+    // ══════════════════════════════════════════════════
+    // Painting helpers
+    // ══════════════════════════════════════════════════
+    private void DrawBottomBorder(object? s, PaintEventArgs e)
+    {
+        using var pen = new Pen(ColorScheme.WithOpacity(Color.White, 25), 1);
+        e.Graphics.DrawLine(pen, 0, Height - 1, Width, Height - 1);
+    }
+
+    // ══════════════════════════════════════════════════
+    // Utilities
+    // ══════════════════════════════════════════════════
+    private static string TruncateName(string name, int max) =>
+        name.Length <= max ? name : name[..max] + "…";
+
+    private void SafeUI(Action a)
+    {
+        if (InvokeRequired) try { Invoke(a); } catch { } else a();
     }
 }

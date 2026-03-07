@@ -1,49 +1,22 @@
 using ClosedXML.Excel;
+using FastReport;
+using FastReport.Export.PdfSimple;
 using System.Data;
 using System.Text;
 
 namespace GraceWay.AccountingSystem.Application.Services;
 
+/// <summary>
+/// خدمة التصدير — Excel عبر ClosedXML، PDF حقيقي عبر FastReport
+/// </summary>
 public class ExportService : IExportService
 {
-    public async Task<bool> ExportToExcelAsync(DataGridView dataGridView, string fileName, string sheetName = "Sheet1")
-    {
-        try
-        {
-            // Convert DataGridView to DataTable
-            DataTable dataTable = new DataTable();
-            
-            // Add columns
-            foreach (DataGridViewColumn column in dataGridView.Columns)
-            {
-                dataTable.Columns.Add(column.HeaderText);
-            }
-            
-            // Add rows
-            foreach (DataGridViewRow row in dataGridView.Rows)
-            {
-                if (!row.IsNewRow)
-                {
-                    DataRow dataRow = dataTable.NewRow();
-                    for (int i = 0; i < dataGridView.Columns.Count; i++)
-                    {
-                        dataRow[i] = row.Cells[i].Value ?? string.Empty;
-                    }
-                    dataTable.Rows.Add(dataRow);
-                }
-            }
-            
-            return await ExportToExcelAsync(dataTable, fileName, sheetName);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"خطأ في التصدير: {ex.Message}", "خطأ",
-                MessageBoxButtons.OK, MessageBoxIcon.Error,
-                MessageBoxDefaultButton.Button1,
-                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
-            return false;
-        }
-    }
+    // ══════════════════════════════════════════════════════════
+    // EXCEL
+    // ══════════════════════════════════════════════════════════
+
+    public async Task<bool> ExportToExcelAsync(DataGridView dgv, string fileName, string sheetName = "Sheet1")
+        => await ExportToExcelAsync(GridToDataTable(dgv), fileName, sheetName);
 
     public async Task<bool> ExportToExcelAsync(DataTable dataTable, string fileName, string sheetName = "Sheet1")
     {
@@ -51,222 +24,354 @@ public class ExportService : IExportService
         {
             try
             {
-                using (var workbook = new XLWorkbook())
+                if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+                    fileName += ".xlsx";
+
+                using var wb = new XLWorkbook();
+                var ws = wb.Worksheets.Add(sheetName);
+
+                int cols = dataTable.Columns.Count;
+                int rows = dataTable.Rows.Count;
+
+                // Header
+                for (int c = 0; c < cols; c++)
                 {
-                    var worksheet = workbook.Worksheets.Add(sheetName);
-                    
-                    // Add header row
-                    for (int i = 0; i < dataTable.Columns.Count; i++)
-                    {
-                        worksheet.Cell(1, i + 1).Value = dataTable.Columns[i].ColumnName;
-                        worksheet.Cell(1, i + 1).Style.Font.Bold = true;
-                        worksheet.Cell(1, i + 1).Style.Fill.BackgroundColor = XLColor.FromArgb(25, 118, 210);
-                        worksheet.Cell(1, i + 1).Style.Font.FontColor = XLColor.White;
-                        worksheet.Cell(1, i + 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-                    }
-                    
-                    // Add data rows
-                    for (int i = 0; i < dataTable.Rows.Count; i++)
-                    {
-                        for (int j = 0; j < dataTable.Columns.Count; j++)
-                        {
-                            var cellValue = dataTable.Rows[i][j];
-                            var cell = worksheet.Cell(i + 2, j + 1);
-                            
-                            // Handle different data types
-                            if (cellValue is decimal || cellValue is double || cellValue is float)
-                            {
-                                cell.Value = Convert.ToDouble(cellValue);
-                                cell.Style.NumberFormat.Format = "#,##0.00";
-                            }
-                            else if (cellValue is int || cellValue is long)
-                            {
-                                cell.Value = Convert.ToInt64(cellValue);
-                            }
-                            else if (cellValue is DateTime)
-                            {
-                                cell.Value = (DateTime)cellValue;
-                                cell.Style.DateFormat.Format = "yyyy/MM/dd";
-                            }
-                            else
-                            {
-                                cell.Value = cellValue?.ToString() ?? string.Empty;
-                            }
-                        }
-                    }
-                    
-                    // Auto-fit columns
-                    worksheet.Columns().AdjustToContents();
-                    
-                    // Ensure file has .xlsx extension
-                    if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
-                    {
-                        fileName += ".xlsx";
-                    }
-                    
-                    workbook.SaveAs(fileName);
+                    var cell = ws.Cell(1, c + 1);
+                    cell.Value = dataTable.Columns[c].ColumnName;
+                    cell.Style.Font.Bold             = true;
+                    cell.Style.Font.FontColor        = XLColor.White;
+                    cell.Style.Fill.BackgroundColor  = XLColor.FromArgb(41, 128, 185);
+                    cell.Style.Alignment.Horizontal  = XLAlignmentHorizontalValues.Center;
+                    cell.Style.Border.BottomBorder   = XLBorderStyleValues.Thin;
+                    cell.Style.Border.BottomBorderColor = XLColor.FromArgb(25, 100, 150);
                 }
-                
+
+                // Data
+                for (int r = 0; r < rows; r++)
+                {
+                    for (int c = 0; c < cols; c++)
+                    {
+                        var val  = dataTable.Rows[r][c];
+                        var cell = ws.Cell(r + 2, c + 1);
+
+                        if (val is decimal or double or float)
+                        {
+                            cell.Value = Convert.ToDouble(val);
+                            cell.Style.NumberFormat.Format = "#,##0.00";
+                        }
+                        else if (val is int or long)
+                            cell.Value = Convert.ToInt64(val);
+                        else if (val is DateTime dt2)
+                        {
+                            cell.Value = dt2;
+                            cell.Style.DateFormat.Format = "yyyy/MM/dd";
+                        }
+                        else
+                            cell.Value = val?.ToString() ?? string.Empty;
+
+                        // alternating rows
+                        if (r % 2 == 1)
+                            cell.Style.Fill.BackgroundColor = XLColor.FromArgb(235, 245, 251);
+                    }
+                }
+
+                // borders + auto-fit
+                if (rows > 0)
+                {
+                    var range = ws.Range(1, 1, rows + 1, cols);
+                    range.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+                    range.Style.Border.InsideBorder  = XLBorderStyleValues.Hair;
+                }
+                ws.Columns().AdjustToContents(8, 60);
+
+                wb.SaveAs(fileName);
                 return true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"خطأ في حفظ ملف Excel: {ex.Message}", "خطأ",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error,
-                    MessageBoxDefaultButton.Button1,
-                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                ShowError($"خطأ في حفظ ملف Excel:\n{ex.Message}");
                 return false;
             }
         });
     }
 
-    public async Task<bool> ExportToPdfAsync(DataGridView dataGridView, string fileName, string title,
+    // ══════════════════════════════════════════════════════════
+    // PDF — FastReport PdfSimple
+    // ══════════════════════════════════════════════════════════
+
+    public async Task<bool> ExportToPdfAsync(DataGridView dgv, string fileName, string title,
         Dictionary<string, string>? metadata = null)
-    {
-        try
-        {
-            string html = CreateHtmlFromDataGridView(dataGridView, title, metadata);
-            return await ExportHtmlToPdfAsync(html, fileName);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"خطأ في التصدير إلى PDF: {ex.Message}", "خطأ",
-                MessageBoxButtons.OK, MessageBoxIcon.Error,
-                MessageBoxDefaultButton.Button1,
-                MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
-            return false;
-        }
-    }
+        => await ExportDataTableToPdfAsync(GridToDataTable(dgv), fileName, title, metadata);
 
     public async Task<bool> ExportHtmlToPdfAsync(string html, string fileName)
+    {
+        // fallback: save HTML and open in browser
+        return await Task.Run(() =>
+        {
+            try
+            {
+                string htmlFile = Path.ChangeExtension(fileName, ".html");
+                File.WriteAllText(htmlFile, html, Encoding.UTF8);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = htmlFile, UseShellExecute = true,
+                });
+                return true;
+            }
+            catch (Exception ex) { ShowError(ex.Message); return false; }
+        });
+    }
+
+    /// <summary>
+    /// بيبني تقرير FastReport من DataTable ويصدّره PDF حقيقي
+    /// </summary>
+    public async Task<bool> ExportDataTableToPdfAsync(DataTable dataTable, string fileName, string title,
+        Dictionary<string, string>? metadata = null)
     {
         return await Task.Run(() =>
         {
             try
             {
-                // For now, save as HTML
-                // In future: use iTextSharp or similar library for proper PDF generation
-                string htmlFileName = fileName.Replace(".pdf", ".html");
-                File.WriteAllText(htmlFileName, html, Encoding.UTF8);
-                
-                MessageBox.Show($"تم حفظ الملف بصيغة HTML:{Environment.NewLine}{htmlFileName}{Environment.NewLine}{Environment.NewLine}يمكنك طباعته كـ PDF من المتصفح", 
-                    "نجح الحفظ",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information,
-                    MessageBoxDefaultButton.Button1,
-                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
-                
-                // Open in browser
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                if (!fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+                    fileName += ".pdf";
+
+                int cols = dataTable.Columns.Count;
+                if (cols == 0) return false;
+
+                // A4 landscape in mm
+                float pageW_mm  = 297f;
+                float pageH_mm  = 210f;
+                float margin_mm = 10f;
+                float usableW   = (pageW_mm - margin_mm * 2) * 2.835f;  // → points
+
+                float colW    = usableW / cols;
+                float rowH    = 18f;
+                float hdrH    = 24f;
+                float titleH  = 32f;
+                float metaH   = 16f;
+                float footerH = 18f;
+
+                using var report = new Report();
+
+                // ── Page setup ───────────────────────────────
+                var page = new ReportPage();
+                report.Pages.Add(page);
+                page.PaperWidth   = pageW_mm;
+                page.PaperHeight  = pageH_mm;
+                page.Landscape    = true;
+                page.LeftMargin   = margin_mm;
+                page.RightMargin  = margin_mm;
+                page.TopMargin    = margin_mm;
+                page.BottomMargin = margin_mm;
+
+                // (no DataSource needed — rows rendered manually below)
+
+                // ── ReportTitle (title + metadata) ───────────
+                int metaCount = metadata?.Count ?? 0;
+                float rptHdrH = titleH + metaCount * metaH + 8f;
+                var rptTitle  = new ReportTitleBand { Height = rptHdrH };
+                page.ReportTitle = rptTitle;
+
+                rptTitle.Objects.Add(new TextObject
                 {
-                    FileName = htmlFileName,
-                    UseShellExecute = true
+                    Bounds      = new System.Drawing.RectangleF(0, 4, usableW, titleH),
+                    Text        = title,
+                    Font        = new System.Drawing.Font("Arial", 15, System.Drawing.FontStyle.Bold),
+                    HorzAlign   = HorzAlign.Center,
+                    TextColor   = System.Drawing.Color.FromArgb(41, 128, 185),
+                    RightToLeft = true,
                 });
-                
+
+                if (metadata != null)
+                {
+                    float mY = titleH + 4f;
+                    foreach (var kv in metadata)
+                    {
+                        rptTitle.Objects.Add(new TextObject
+                        {
+                            Bounds      = new System.Drawing.RectangleF(0, mY, usableW, metaH),
+                            Text        = $"{kv.Key}: {kv.Value}",
+                            Font        = new System.Drawing.Font("Arial", 8.5f),
+                            HorzAlign   = HorzAlign.Center,
+                            TextColor   = System.Drawing.Color.FromArgb(100, 116, 139),
+                            RightToLeft = true,
+                        });
+                        mY += metaH;
+                    }
+                }
+
+                // ── PageHeader (column headers) ───────────────
+                var pgHdr = new PageHeaderBand { Height = hdrH };
+                page.PageHeader = pgHdr;
+
+                for (int c = 0; c < cols; c++)
+                {
+                    pgHdr.Objects.Add(new TextObject
+                    {
+                        Bounds      = new System.Drawing.RectangleF(c * colW, 0, colW, hdrH),
+                        Text        = dataTable.Columns[c].ColumnName,
+                        Font        = new System.Drawing.Font("Arial", 8.5f, System.Drawing.FontStyle.Bold),
+                        HorzAlign   = HorzAlign.Center,
+                        VertAlign   = VertAlign.Center,
+                        FillColor   = System.Drawing.Color.FromArgb(41, 128, 185),
+                        TextColor   = System.Drawing.Color.White,
+                        RightToLeft = true,
+                        Border      = new Border
+                        {
+                            Lines = BorderLines.All,
+                            Color = System.Drawing.Color.FromArgb(25, 100, 155),
+                            Width = 0.5f,
+                        },
+                    });
+                }
+
+                // ── Data rows — rendered manually in ReportTitle ──
+                var dataSection = new ReportSummaryBand
+                {
+                    Height = dataTable.Rows.Count * rowH,
+                };
+                page.ReportSummary = dataSection;
+
+                for (int r = 0; r < dataTable.Rows.Count; r++)
+                {
+                    var rowColor = r % 2 == 0
+                        ? System.Drawing.Color.White
+                        : System.Drawing.Color.FromArgb(235, 245, 251);
+
+                    for (int c = 0; c < cols; c++)
+                    {
+                        dataSection.Objects.Add(new TextObject
+                        {
+                            Bounds      = new System.Drawing.RectangleF(c * colW, r * rowH, colW, rowH),
+                            Text        = dataTable.Rows[r][c]?.ToString() ?? string.Empty,
+                            Font        = new System.Drawing.Font("Arial", 8f),
+                            HorzAlign   = HorzAlign.Center,
+                            VertAlign   = VertAlign.Center,
+                            FillColor   = rowColor,
+                            RightToLeft = true,
+                            Border      = new Border
+                            {
+                                Lines = BorderLines.All,
+                                Color = System.Drawing.Color.FromArgb(210, 218, 226),
+                                Width = 0.3f,
+                            },
+                        });
+                    }
+                }
+
+                // ── PageFooter ────────────────────────────────
+                var pgFtr = new PageFooterBand { Height = footerH };
+                page.PageFooter = pgFtr;
+
+                pgFtr.Objects.Add(new TextObject
+                {
+                    Bounds      = new System.Drawing.RectangleF(0, 2, usableW * 0.7f, footerH - 4),
+                    Text        = $"تم الإنشاء: {DateTime.Now:yyyy/MM/dd HH:mm}  —  نظام جريس واي المحاسبي",
+                    Font        = new System.Drawing.Font("Arial", 7f),
+                    TextColor   = System.Drawing.Color.FromArgb(140, 150, 160),
+                    HorzAlign   = HorzAlign.Right,
+                    RightToLeft = true,
+                });
+                pgFtr.Objects.Add(new TextObject
+                {
+                    Bounds    = new System.Drawing.RectangleF(usableW * 0.7f, 2, usableW * 0.3f, footerH - 4),
+                    Text      = "صفحة [Page#] من [TotalPages#]",
+                    Font      = new System.Drawing.Font("Arial", 7f),
+                    TextColor = System.Drawing.Color.FromArgb(140, 150, 160),
+                    HorzAlign = HorzAlign.Left,
+                });
+
+                // ── Prepare & export ──────────────────────────
+                report.Prepare();
+
+                using var pdf = new PDFSimpleExport();
+                pdf.Export(report, fileName);
+
                 return true;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"خطأ في حفظ PDF: {ex.Message}", "خطأ",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error,
-                    MessageBoxDefaultButton.Button1,
-                    MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+                ShowError($"خطأ في تصدير PDF:\n{ex.Message}");
                 return false;
             }
         });
     }
 
-    public string CreateHtmlFromDataGridView(DataGridView dataGridView, string title,
+    // ══════════════════════════════════════════════════════════
+    // HTML helper (backward compat)
+    // ══════════════════════════════════════════════════════════
+
+    public string CreateHtmlFromDataGridView(DataGridView dgv, string title,
         Dictionary<string, string>? metadata = null)
     {
-        StringBuilder html = new StringBuilder();
-        
-        html.AppendLine("<!DOCTYPE html>");
-        html.AppendLine("<html dir='rtl' lang='ar'>");
-        html.AppendLine("<head>");
-        html.AppendLine("    <meta charset='UTF-8'>");
-        html.AppendLine($"    <title>{title}</title>");
-        html.AppendLine("    <style>");
-        html.AppendLine("        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');");
-        html.AppendLine("        body { font-family: 'Cairo', Arial, sans-serif; margin: 20px; direction: rtl; }");
-        html.AppendLine("        h1 { color: #1976D2; text-align: center; margin-bottom: 10px; }");
-        html.AppendLine("        .metadata { text-align: center; color: #666; margin-bottom: 20px; font-size: 14px; }");
-        html.AppendLine("        table { width: 100%; border-collapse: collapse; margin: 20px 0; }");
-        html.AppendLine("        th { background-color: #1976D2; color: white; padding: 12px; text-align: center; font-weight: bold; }");
-        html.AppendLine("        td { padding: 10px; text-align: center; border: 1px solid #ddd; }");
-        html.AppendLine("        tr:nth-child(even) { background-color: #f8f8f8; }");
-        html.AppendLine("        tr:hover { background-color: #e3f2fd; }");
-        html.AppendLine("        .total-row { background-color: #c8e6c9 !important; font-weight: bold; }");
-        html.AppendLine("        .header-row { background-color: #1976D2 !important; color: white !important; font-weight: bold; }");
-        html.AppendLine("        .footer { text-align: center; margin-top: 30px; color: #999; font-size: 12px; }");
-        html.AppendLine("        @media print { body { margin: 0; } }");
-        html.AppendLine("    </style>");
-        html.AppendLine("</head>");
-        html.AppendLine("<body>");
-        
-        // Title
-        html.AppendLine($"    <h1>{title}</h1>");
-        
-        // Metadata
-        if (metadata != null && metadata.Count > 0)
+        var dt = GridToDataTable(dgv);
+        var sb = new StringBuilder();
+        sb.AppendLine("<!DOCTYPE html><html dir='rtl' lang='ar'><head><meta charset='UTF-8'>");
+        sb.AppendLine($"<title>{title}</title><style>");
+        sb.AppendLine("body{{font-family:Cairo,Arial;margin:20px;direction:rtl}}");
+        sb.AppendLine("h1{{color:#2980B9;text-align:center}}");
+        sb.AppendLine("table{{width:100%;border-collapse:collapse}}");
+        sb.AppendLine("th{{background:#2980B9;color:#fff;padding:10px;text-align:center}}");
+        sb.AppendLine("td{{padding:8px;text-align:center;border:1px solid #ddd}}");
+        sb.AppendLine("tr:nth-child(even){{background:#EBF5FB}}");
+        sb.AppendLine("</style></head><body>");
+        sb.AppendLine($"<h1>{title}</h1>");
+        if (metadata != null)
         {
-            html.AppendLine("    <div class='metadata'>");
-            foreach (var item in metadata)
+            sb.AppendLine("<p style='text-align:center;color:#666'>");
+            foreach (var kv in metadata) sb.Append($" {kv.Key}: <b>{kv.Value}</b> &nbsp;|&nbsp;");
+            sb.AppendLine("</p>");
+        }
+        sb.AppendLine("<table><thead><tr>");
+        foreach (DataColumn col in dt.Columns) sb.AppendLine($"<th>{col.ColumnName}</th>");
+        sb.AppendLine("</tr></thead><tbody>");
+        foreach (DataRow row in dt.Rows)
+        {
+            sb.AppendLine("<tr>");
+            foreach (var v in row.ItemArray) sb.AppendLine($"<td>{v}</td>");
+            sb.AppendLine("</tr>");
+        }
+        sb.AppendLine("</tbody></table>");
+        sb.AppendLine($"<p style='text-align:center;color:#aaa;font-size:11px'>تم الإنشاء: {DateTime.Now:yyyy/MM/dd HH:mm} — نظام جريس واي</p>");
+        sb.AppendLine("</body></html>");
+        return sb.ToString();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // Private helpers
+    // ══════════════════════════════════════════════════════════
+
+    private static DataTable GridToDataTable(DataGridView dgv)
+    {
+        var dt = new DataTable();
+        foreach (DataGridViewColumn col in dgv.Columns)
+            if (col.Visible) dt.Columns.Add(col.HeaderText);
+
+        foreach (DataGridViewRow row in dgv.Rows)
+        {
+            if (row.IsNewRow) continue;
+            var dr  = dt.NewRow();
+            int idx = 0;
+            foreach (DataGridViewColumn col in dgv.Columns)
             {
-                html.AppendLine($"        <p>{item.Key}: {item.Value}</p>");
+                if (!col.Visible) continue;
+                dr[idx++] = row.Cells[col.Index].Value ?? string.Empty;
             }
-            html.AppendLine("    </div>");
+            dt.Rows.Add(dr);
         }
-        
-        // Table
-        html.AppendLine("    <table>");
-        html.AppendLine("        <thead>");
-        html.AppendLine("            <tr>");
-        foreach (DataGridViewColumn column in dataGridView.Columns)
-        {
-            html.AppendLine($"                <th>{column.HeaderText}</th>");
-        }
-        html.AppendLine("            </tr>");
-        html.AppendLine("        </thead>");
-        html.AppendLine("        <tbody>");
-        
-        foreach (DataGridViewRow row in dataGridView.Rows)
-        {
-            if (!row.IsNewRow)
-            {
-                // Check if this is a special row (header, total, etc.)
-                string rowClass = "";
-                if (row.DefaultCellStyle.BackColor == Color.FromArgb(200, 230, 201) ||
-                    row.DefaultCellStyle.BackColor == Color.FromArgb(255, 205, 210))
-                {
-                    rowClass = " class='total-row'";
-                }
-                else if (row.DefaultCellStyle.BackColor == Color.FromArgb(25, 118, 210))
-                {
-                    rowClass = " class='header-row'";
-                }
-                
-                html.AppendLine($"            <tr{rowClass}>");
-                foreach (DataGridViewCell cell in row.Cells)
-                {
-                    string cellValue = cell.Value?.ToString() ?? string.Empty;
-                    html.AppendLine($"                <td>{cellValue}</td>");
-                }
-                html.AppendLine("            </tr>");
-            }
-        }
-        
-        html.AppendLine("        </tbody>");
-        html.AppendLine("    </table>");
-        
-        // Footer
-        html.AppendLine("    <div class='footer'>");
-        html.AppendLine($"        <p>تم الإنشاء في: {DateTime.Now:yyyy/MM/dd HH:mm}</p>");
-        html.AppendLine("        <p>نظام جراس واي المحاسبي</p>");
-        html.AppendLine("    </div>");
-        
-        html.AppendLine("</body>");
-        html.AppendLine("</html>");
-        
-        return html.ToString();
+        return dt;
+    }
+
+    private static void ShowError(string msg)
+    {
+        var form = System.Windows.Forms.Application.OpenForms.Count > 0
+            ? System.Windows.Forms.Application.OpenForms[0] : null;
+        if (form == null) return;
+
+        void Show() => MessageBox.Show(msg, "خطأ", MessageBoxButtons.OK, MessageBoxIcon.Error,
+            MessageBoxDefaultButton.Button1,
+            MessageBoxOptions.RtlReading | MessageBoxOptions.RightAlign);
+
+        if (form.InvokeRequired) form.Invoke(Show); else Show();
     }
 }

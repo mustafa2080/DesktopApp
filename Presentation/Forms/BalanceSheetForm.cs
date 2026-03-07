@@ -8,15 +8,15 @@ namespace GraceWay.AccountingSystem.Presentation.Forms;
 public partial class BalanceSheetForm : Form
 {
     private readonly IDbContextFactory<AppDbContext> _dbContextFactory;
-    private DateTimePicker dtpAsOf;
-    private DataGridView dgvBalanceSheet;
-    private Button btnGenerate;
-    private Button btnExport;
-    private Button btnPrint;
-    private Label lblTotalAssets;
-    private Label lblTotalLiabilities;
-    private Label lblTotalEquity;
-    private Label lblBalance;
+    private DateTimePicker dtpAsOf = null!;
+    private DataGridView dgvBalanceSheet = null!;
+    private Button btnGenerate = null!;
+    private Button btnExport = null!;
+    private Button btnPrint = null!;
+    private Label lblTotalAssets = null!;
+    private Label lblTotalLiabilities = null!;
+    private Label lblTotalEquity = null!;
+    private Label lblBalance = null!;
     
     // For printing
     private int currentRow = 0;
